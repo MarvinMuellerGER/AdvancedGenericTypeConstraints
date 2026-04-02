@@ -6,6 +6,23 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>OpenGenericConstraints</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PackageId>OpenGenericConstraints.Abstractions</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Marvin Muller</Authors>
+    <Company>Marvin Muller</Company>
+    <Description>Attributes for expressing open generic constraints that are enforced by the OpenGenericConstraints Roslyn analyzer.</Description>
+    <PackageTags>roslyn;analyzer;generics;constraints;csharp</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/marvinmuller/OpenGenericConstraints</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/marvinmuller/OpenGenericConstraints</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+  </ItemGroup>
 
 </Project>
