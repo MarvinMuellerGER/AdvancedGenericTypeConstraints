@@ -29,24 +29,17 @@ Install both packages in the consuming project:
 ```csharp
 using OpenGenericConstraints;
 
-public interface IHandleMessages<TMessage>
-{
-}
+public interface IHandleMessages<TMessage>;
 
 public interface IFeatureRegistry
 {
     void RegisterMessageHandler<
-        [MustImplementOpenGeneric(typeof(IHandleMessages<>))]
-        TMessageHandler>();
+        [MustImplementOpenGeneric(typeof(IHandleMessages<>))] TMessageHandler>();
 }
 
-public sealed class MyMessage
-{
-}
+public sealed class MyMessage;
 
-public sealed class MyHandler : IHandleMessages<MyMessage>
-{
-}
+public sealed class MyHandler : IHandleMessages<MyMessage>;
 ```
 
 Using `RegisterMessageHandler<MyHandler>()` is valid.
