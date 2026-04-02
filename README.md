@@ -1,10 +1,12 @@
 # OpenGenericConstraints
 
-OpenGenericConstraints enables compile-time-like validation for open generic constraints in C# by combining lightweight attributes with a Roslyn analyzer.
+OpenGenericConstraints enables compile-time-like validation for open generic constraints in C# by combining lightweight
+attributes with a Roslyn analyzer.
 
 ## Why this exists
 
-C# generic constraints cannot express rules like "the supplied type must implement `IHandleMessages<T>` for some `T`" when the constraint targets an open generic type definition.
+C# generic constraints cannot express rules like "the supplied type must implement `IHandleMessages<T>` for some `T`"
+when the constraint targets an open generic type definition.
 
 This project closes that gap with:
 
@@ -65,7 +67,8 @@ A type counts as a match when the configured open generic type definition appear
 - any base type in its inheritance chain
 - any implemented interface
 
-This means matching is not limited to interfaces. Open generic classes, interfaces, and other generic type definitions are all supported as long as the open generic definition matches.
+This means matching is not limited to interfaces. Open generic classes, interfaces, and other generic type definitions
+are all supported as long as the open generic definition matches.
 
 ## Current API
 

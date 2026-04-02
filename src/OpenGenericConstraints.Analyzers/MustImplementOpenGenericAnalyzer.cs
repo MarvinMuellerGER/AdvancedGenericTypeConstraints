@@ -7,11 +7,25 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace OpenGenericConstraints.Analyzers;
 
+/// <summary>
+/// Reports diagnostics for open generic constraints declared with OpenGenericConstraints attributes.
+/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
 {
+    /// <summary>
+    /// Diagnostic emitted when a type argument does not match a required open generic type definition.
+    /// </summary>
     public const string MustImplementDiagnosticId = "OGC001";
+
+    /// <summary>
+    /// Diagnostic emitted when a type argument matches a forbidden open generic type definition.
+    /// </summary>
     public const string MustNotImplementDiagnosticId = "OGC002";
+
+    /// <summary>
+    /// Diagnostic emitted when a type argument does not match a required open generic type definition exactly once.
+    /// </summary>
     public const string MustImplementExactlyOneDiagnosticId = "OGC003";
 
     private static readonly DiagnosticDescriptor MustImplementRule = new(
@@ -41,8 +55,11 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
         true,
         "Ensures that a generic type argument matches the required open generic type definition exactly once.");
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [MustImplementRule, MustNotImplementRule, MustImplementExactlyOneRule];
+    /// <inheritdoc />
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        [MustImplementRule, MustNotImplementRule, MustImplementExactlyOneRule];
 
+    /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -57,14 +74,17 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
                 startContext.Compilation.GetTypeByMetadataName(
                     "OpenGenericConstraints.MustNotImplementOpenGenericAttribute");
 
-            if (mustImplementAttributeSymbol is null && mustNotImplementAttributeSymbol is null) return;
+            if (mustImplementAttributeSymbol is null && mustNotImplementAttributeSymbol is null)
+                return;
 
             startContext.RegisterOperationAction(
-                operationContext => AnalyzeInvocation(operationContext, mustImplementAttributeSymbol, mustNotImplementAttributeSymbol),
+                operationContext => AnalyzeInvocation(operationContext, mustImplementAttributeSymbol,
+                    mustNotImplementAttributeSymbol),
                 OperationKind.Invocation);
 
             startContext.RegisterSyntaxNodeAction(
-                syntaxContext => AnalyzeGenericTypeUsage(syntaxContext, mustImplementAttributeSymbol, mustNotImplementAttributeSymbol),
+                syntaxContext => AnalyzeGenericTypeUsage(syntaxContext, mustImplementAttributeSymbol,
+                    mustNotImplementAttributeSymbol),
                 SyntaxKind.GenericName);
         });
     }
@@ -93,7 +113,8 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
         var symbol = ModelExtensions.GetSymbolInfo(context.SemanticModel, genericName, context.CancellationToken)
             .Symbol;
 
-        if (symbol is not INamedTypeSymbol namedType || namedType.IsUnboundGenericType) return;
+        if (symbol is not INamedTypeSymbol namedType || namedType.IsUnboundGenericType)
+            return;
 
         ValidateTypeArguments(
             namedType.TypeParameters,
@@ -123,22 +144,19 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
                 if (constraint.ExactlyOne)
                 {
                     if (matchCount is 1)
-                    {
                         continue;
-                    }
 
                     reportDiagnostic(Diagnostic.Create(
                         MustImplementExactlyOneRule,
                         location,
                         typeArgument.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
                         ToOpenGenericDisplayString(constraint.OpenGenericType)));
+
                     continue;
                 }
 
                 if (matchCount > 0)
-                {
                     continue;
-                }
 
                 reportDiagnostic(Diagnostic.Create(
                     MustImplementRule,
@@ -147,19 +165,14 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
                     ToOpenGenericDisplayString(constraint.OpenGenericType)));
             }
 
-            foreach (var forbiddenOpenGeneric in GetMustNotImplementConstraints(typeParameters[index], mustNotImplementAttributeSymbol))
-            {
-                if (CountMatches(matches, forbiddenOpenGeneric) is 0)
-                {
-                    continue;
-                }
-
+            foreach (var forbiddenOpenGeneric in
+                     GetMustNotImplementConstraints(typeParameters[index], mustNotImplementAttributeSymbol)
+                         .Where(forbiddenOpenGeneric => CountMatches(matches, forbiddenOpenGeneric) is not 0))
                 reportDiagnostic(Diagnostic.Create(
                     MustNotImplementRule,
                     location,
                     typeArgument.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
                     ToOpenGenericDisplayString(forbiddenOpenGeneric)));
-            }
         }
     }
 
@@ -168,9 +181,7 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
         INamedTypeSymbol? attributeSymbol)
     {
         if (attributeSymbol is null)
-        {
             return [];
-        }
 
         var builder = ImmutableArray.CreateBuilder<MustImplementConstraint>();
 
@@ -182,7 +193,8 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
         foreach (var attribute in relevantAttributes)
         {
             var constructorArgument = attribute.ConstructorArguments[0];
-            if (constructorArgument.Value is not INamedTypeSymbol openGenericType) continue;
+            if (constructorArgument.Value is not INamedTypeSymbol openGenericType)
+                continue;
 
             var exactlyOne = attribute.ConstructorArguments.Length is 2 &&
                              attribute.ConstructorArguments[1].Value is true;
@@ -198,9 +210,7 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
         INamedTypeSymbol? attributeSymbol)
     {
         if (attributeSymbol is null)
-        {
             return [];
-        }
 
         var builder = ImmutableArray.CreateBuilder<INamedTypeSymbol>();
 
@@ -212,7 +222,8 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
         foreach (var attribute in relevantAttributes)
         {
             var constructorArgument = attribute.ConstructorArguments[0];
-            if (constructorArgument.Value is not INamedTypeSymbol openGenericType) continue;
+            if (constructorArgument.Value is not INamedTypeSymbol openGenericType)
+                continue;
 
             builder.Add(openGenericType.OriginalDefinition);
         }
@@ -229,30 +240,22 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
             AddIfGeneric(builder, namedType);
 
             for (var baseType = namedType.BaseType; baseType is not null; baseType = baseType.BaseType)
-            {
                 AddIfGeneric(builder, baseType);
-            }
         }
 
         foreach (var implementedInterface in typeArgument.AllInterfaces)
-        {
             AddIfGeneric(builder, implementedInterface);
-        }
 
         return builder.ToImmutable();
     }
 
-    private static int CountMatches(ImmutableArray<INamedTypeSymbol> matches, INamedTypeSymbol openGenericType)
-    {
-        return matches.Count(match => SymbolEqualityComparer.Default.Equals(match.OriginalDefinition, openGenericType));
-    }
+    private static int CountMatches(ImmutableArray<INamedTypeSymbol> matches, INamedTypeSymbol openGenericType) =>
+        matches.Count(match => SymbolEqualityComparer.Default.Equals(match.OriginalDefinition, openGenericType));
 
     private static void AddIfGeneric(ImmutableArray<INamedTypeSymbol>.Builder builder, INamedTypeSymbol namedType)
     {
         if (!namedType.IsGenericType)
-        {
             return;
-        }
 
         builder.Add(namedType.OriginalDefinition);
     }
@@ -260,16 +263,10 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
     private static string ToOpenGenericDisplayString(INamedTypeSymbol openGenericType) => openGenericType
         .ConstructUnboundGenericType().ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
 
-    private readonly struct MustImplementConstraint
+    private readonly struct MustImplementConstraint(INamedTypeSymbol openGenericType, bool exactlyOne)
     {
-        public MustImplementConstraint(INamedTypeSymbol openGenericType, bool exactlyOne)
-        {
-            OpenGenericType = openGenericType;
-            ExactlyOne = exactlyOne;
-        }
+        public INamedTypeSymbol OpenGenericType { get; } = openGenericType;
 
-        public INamedTypeSymbol OpenGenericType { get; }
-
-        public bool ExactlyOne { get; }
+        public bool ExactlyOne { get; } = exactlyOne;
     }
 }
