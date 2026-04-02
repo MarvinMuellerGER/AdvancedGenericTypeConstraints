@@ -27,6 +27,5 @@ error OGC001: Type 'MyHandler' must implement 'IHandleMessages<>'
 
 ## Notes
 
-- The sample uses `samples/NuGetPackageConsumer/NuGet.Config` to resolve packages from `artifacts/nuget`.
-- If needed, repack version `0.1.0` into `artifacts/nuget` before building the sample.
+- The sample restores packages directly from NuGet.org.
 - This project is intentionally not part of the solution because it is supposed to fail.
