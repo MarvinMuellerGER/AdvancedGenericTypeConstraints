@@ -8,7 +8,7 @@ namespace OpenGenericConstraints.Analyzers.Tests;
 public class MustImplementOpenGenericAnalyzerTests
 {
     [Fact]
-    public async Task Reports_No_Diagnostic_When_Type_Implements_Required_Open_Generic()
+    public async Task ReportsNoDiagnostic_When_TypeImplementsRequiredOpenGeneric()
     {
         const string source = """
                               using System;
@@ -40,7 +40,7 @@ public class MustImplementOpenGenericAnalyzerTests
     }
 
     [Fact]
-    public async Task Reports_Diagnostic_When_Type_Does_Not_Implement_Required_Open_Generic()
+    public async Task ReportsDiagnostic_When_TypeDoesNotImplementRequiredOpenGeneric()
     {
         const string source = """
                               using System;
@@ -72,7 +72,7 @@ public class MustImplementOpenGenericAnalyzerTests
     }
 
     [Fact]
-    public async Task Reports_Diagnostic_When_Type_Implements_Different_Open_Generic()
+    public async Task ReportsDiagnostic_When_TypeImplementsDifferentOpenGeneric()
     {
         const string source = """
                               using System;
@@ -107,7 +107,7 @@ public class MustImplementOpenGenericAnalyzerTests
     }
 
     [Fact]
-    public async Task Reports_Diagnostic_For_Generic_Type_Usage()
+    public async Task ReportsDiagnostic_When_GenericTypeUsageViolatesConstraint()
     {
         const string source = """
                               using OpenGenericConstraints;
@@ -134,7 +134,7 @@ public class MustImplementOpenGenericAnalyzerTests
     }
 
     [Fact]
-    public async Task Reports_No_Diagnostic_When_Generic_Base_Type_Matches()
+    public async Task ReportsNoDiagnostic_When_GenericBaseTypeMatches()
     {
         const string source = """
                               using OpenGenericConstraints;
@@ -171,7 +171,7 @@ public class MustImplementOpenGenericAnalyzerTests
     }
 
     [Fact]
-    public async Task Reports_Diagnostic_When_Type_Must_Not_Implement_Open_Generic()
+    public async Task ReportsDiagnostic_When_TypeMustNotImplementOpenGeneric()
     {
         const string source = """
                               using OpenGenericConstraints;
@@ -204,7 +204,7 @@ public class MustImplementOpenGenericAnalyzerTests
     }
 
     [Fact]
-    public async Task Reports_Diagnostic_When_Exactly_One_Match_Is_Required_But_None_Exist()
+    public async Task ReportsDiagnostic_When_ExactlyOneMatchIsRequiredButNoneExist()
     {
         const string source = """
                               using OpenGenericConstraints;
@@ -235,7 +235,7 @@ public class MustImplementOpenGenericAnalyzerTests
     }
 
     [Fact]
-    public async Task Reports_Diagnostic_When_Exactly_One_Match_Is_Required_But_Multiple_Exist()
+    public async Task ReportsDiagnostic_When_ExactlyOneMatchIsRequiredButMultipleExist()
     {
         const string source = """
                               using OpenGenericConstraints;
@@ -269,7 +269,7 @@ public class MustImplementOpenGenericAnalyzerTests
     }
 
     [Fact]
-    public async Task Reports_No_Diagnostic_When_Exactly_One_Match_Is_Required_And_One_Exists()
+    public async Task ReportsNoDiagnostic_When_ExactlyOneMatchIsRequiredAndOneExists()
     {
         const string source = """
                               using OpenGenericConstraints;
