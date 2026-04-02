@@ -69,12 +69,26 @@ This means matching is not limited to interfaces. Open generic classes, interfac
 
 ## Current API
 
-Today the project supports `MustImplementOpenGenericAttribute`.
+The project currently supports:
 
-The next planned additions are:
-
+- `MustImplementOpenGenericAttribute`
+- `MustImplementOpenGenericAttribute(Type openGenericType, bool exactlyOne)`
 - `MustNotImplementOpenGenericAttribute`
-- an `exactlyOne` option on `MustImplementOpenGenericAttribute` to distinguish "at least one match" from "exactly one match"
+
+Example:
+
+```csharp
+public interface IFeatureRegistry
+{
+    void RegisterSingle<
+        [MustImplementOpenGeneric(typeof(IHandleMessages<>), true)]
+        THandler>();
+
+    void RegisterWithoutSagaStarter<
+        [MustNotImplementOpenGeneric(typeof(IAmStartedByMessages<>))]
+        THandler>();
+}
+```
 
 ## Non-goals
 

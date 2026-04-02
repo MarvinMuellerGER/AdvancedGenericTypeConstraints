@@ -67,7 +67,7 @@ public class MustImplementOpenGenericAnalyzerTests
         var diagnostics = await GetDiagnosticsAsync(source);
 
         var diagnostic = Assert.Single(diagnostics);
-        Assert.Equal(MustImplementOpenGenericAnalyzer.DiagnosticId, diagnostic.Id);
+        Assert.Equal(MustImplementOpenGenericAnalyzer.MustImplementDiagnosticId, diagnostic.Id);
         Assert.Equal("Type 'MyHandler' must implement 'IHandleMessages<>'", diagnostic.GetMessage());
     }
 
@@ -102,7 +102,7 @@ public class MustImplementOpenGenericAnalyzerTests
         var diagnostics = await GetDiagnosticsAsync(source);
 
         var diagnostic = Assert.Single(diagnostics);
-        Assert.Equal(MustImplementOpenGenericAnalyzer.DiagnosticId, diagnostic.Id);
+        Assert.Equal(MustImplementOpenGenericAnalyzer.MustImplementDiagnosticId, diagnostic.Id);
         Assert.Equal("Type 'MyHandler' must implement 'IHandleMessages<>'", diagnostic.GetMessage());
     }
 
@@ -129,8 +129,174 @@ public class MustImplementOpenGenericAnalyzerTests
         var diagnostics = await GetDiagnosticsAsync(source);
 
         var diagnostic = Assert.Single(diagnostics);
-        Assert.Equal(MustImplementOpenGenericAnalyzer.DiagnosticId, diagnostic.Id);
+        Assert.Equal(MustImplementOpenGenericAnalyzer.MustImplementDiagnosticId, diagnostic.Id);
         Assert.Equal("Type 'MyHandler' must implement 'IHandleMessages<>'", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task Reports_No_Diagnostic_When_Generic_Base_Type_Matches()
+    {
+        const string source = """
+            using OpenGenericConstraints;
+
+            public class MessageHandler<TMessage>
+            {
+            }
+
+            public sealed class MyMessage
+            {
+            }
+
+            public sealed class MyHandler : MessageHandler<MyMessage>
+            {
+            }
+
+            public interface IFeatureRegistry
+            {
+                void Register<[MustImplementOpenGeneric(typeof(MessageHandler<>))] THandler>();
+            }
+
+            public static class Demo
+            {
+                public static void Run(IFeatureRegistry registry)
+                {
+                    registry.Register<MyHandler>();
+                }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task Reports_Diagnostic_When_Type_Must_Not_Implement_Open_Generic()
+    {
+        const string source = """
+            using OpenGenericConstraints;
+
+            public interface IHandleMessages<T> { }
+
+            public sealed class MyMessage { }
+
+            public sealed class MyHandler : IHandleMessages<MyMessage> { }
+
+            public interface IFeatureRegistry
+            {
+                void Register<[MustNotImplementOpenGeneric(typeof(IHandleMessages<>))] THandler>();
+            }
+
+            public static class Demo
+            {
+                public static void Run(IFeatureRegistry registry)
+                {
+                    registry.Register<MyHandler>();
+                }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(MustImplementOpenGenericAnalyzer.MustNotImplementDiagnosticId, diagnostic.Id);
+        Assert.Equal("Type 'MyHandler' must not implement 'IHandleMessages<>'", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task Reports_Diagnostic_When_Exactly_One_Match_Is_Required_But_None_Exist()
+    {
+        const string source = """
+            using OpenGenericConstraints;
+
+            public interface IHandleMessages<T> { }
+
+            public sealed class MyHandler { }
+
+            public interface IFeatureRegistry
+            {
+                void Register<[MustImplementOpenGeneric(typeof(IHandleMessages<>), true)] THandler>();
+            }
+
+            public static class Demo
+            {
+                public static void Run(IFeatureRegistry registry)
+                {
+                    registry.Register<MyHandler>();
+                }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(MustImplementOpenGenericAnalyzer.MustImplementExactlyOneDiagnosticId, diagnostic.Id);
+        Assert.Equal("Type 'MyHandler' must implement 'IHandleMessages<>' exactly once", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task Reports_Diagnostic_When_Exactly_One_Match_Is_Required_But_Multiple_Exist()
+    {
+        const string source = """
+            using OpenGenericConstraints;
+
+            public interface IHandleMessages<T> { }
+
+            public sealed class MessageA { }
+            public sealed class MessageB { }
+
+            public sealed class MyHandler : IHandleMessages<MessageA>, IHandleMessages<MessageB> { }
+
+            public interface IFeatureRegistry
+            {
+                void Register<[MustImplementOpenGeneric(typeof(IHandleMessages<>), true)] THandler>();
+            }
+
+            public static class Demo
+            {
+                public static void Run(IFeatureRegistry registry)
+                {
+                    registry.Register<MyHandler>();
+                }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(MustImplementOpenGenericAnalyzer.MustImplementExactlyOneDiagnosticId, diagnostic.Id);
+        Assert.Equal("Type 'MyHandler' must implement 'IHandleMessages<>' exactly once", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task Reports_No_Diagnostic_When_Exactly_One_Match_Is_Required_And_One_Exists()
+    {
+        const string source = """
+            using OpenGenericConstraints;
+
+            public interface IHandleMessages<T> { }
+
+            public sealed class MyMessage { }
+
+            public sealed class MyHandler : IHandleMessages<MyMessage> { }
+
+            public interface IFeatureRegistry
+            {
+                void Register<[MustImplementOpenGeneric(typeof(IHandleMessages<>), true)] THandler>();
+            }
+
+            public static class Demo
+            {
+                public static void Run(IFeatureRegistry registry)
+                {
+                    registry.Register<MyHandler>();
+                }
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
     }
 
     private static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(string source)

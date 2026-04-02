@@ -1,22 +1,14 @@
 namespace OpenGenericConstraints;
 
 [AttributeUsage(AttributeTargets.GenericParameter, AllowMultiple = true)]
-public sealed class MustImplementOpenGenericAttribute : Attribute
+public sealed class MustNotImplementOpenGenericAttribute : Attribute
 {
-    public MustImplementOpenGenericAttribute(Type openGenericType)
-        : this(openGenericType, exactlyOne: false)
-    {
-    }
-
-    public MustImplementOpenGenericAttribute(Type openGenericType, bool exactlyOne)
+    public MustNotImplementOpenGenericAttribute(Type openGenericType)
     {
         OpenGenericType = ValidateOpenGenericType(openGenericType);
-        ExactlyOne = exactlyOne;
     }
 
     public Type OpenGenericType { get; }
-
-    public bool ExactlyOne { get; }
 
     private static Type ValidateOpenGenericType(Type openGenericType)
     {
