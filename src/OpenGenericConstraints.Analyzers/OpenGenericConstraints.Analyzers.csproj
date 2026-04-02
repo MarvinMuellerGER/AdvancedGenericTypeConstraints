@@ -5,23 +5,14 @@
         <LangVersion>latest</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <IncludeBuildOutput>false</IncludeBuildOutput>
         <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
         <NoWarn>$(NoWarn);RS2007</NoWarn>
         <IsPackable>true</IsPackable>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
         <PackageId>OpenGenericConstraints.Analyzers</PackageId>
-        <Version>0.1.0</Version>
-        <Authors>Marvin Muller</Authors>
-        <Company>Marvin Muller</Company>
         <Description>Roslyn analyzers that validate open generic constraints declared with OpenGenericConstraints attributes.</Description>
         <PackageTags>roslyn;analyzer;generics;constraints;csharp</PackageTags>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <RepositoryUrl>https://github.com/marvinmuller/OpenGenericConstraints</RepositoryUrl>
-        <PackageProjectUrl>https://github.com/marvinmuller/OpenGenericConstraints</PackageProjectUrl>
-        <PackageReadmeFile>README.md</PackageReadmeFile>
-        <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
         <DevelopmentDependency>true</DevelopmentDependency>
         <NoPackageAnalysis>true</NoPackageAnalysis>
     </PropertyGroup>
@@ -39,7 +30,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Include="..\..\README.md" Pack="true" PackagePath="\" Link="README.md"/>
         <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
         <None Include="$(OutputPath)$(AssemblyName).xml" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
     </ItemGroup>
