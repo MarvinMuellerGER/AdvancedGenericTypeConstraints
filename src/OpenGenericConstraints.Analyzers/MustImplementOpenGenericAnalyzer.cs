@@ -28,6 +28,11 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
     /// </summary>
     public const string MustImplementExactlyOneDiagnosticId = "OGC003";
 
+    /// <summary>
+    /// Diagnostic emitted when a generic parameter declares multiple non-interface MustImplementOpenGeneric constraints.
+    /// </summary>
+    public const string InvalidMustImplementConfigurationDiagnosticId = "OGC004";
+
     private static readonly DiagnosticDescriptor MustImplementRule = new(
         MustImplementDiagnosticId,
         "Type argument must implement the required open generic type",
@@ -55,9 +60,18 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
         true,
         "Ensures that a generic type argument matches the required open generic type definition exactly once.");
 
+    private static readonly DiagnosticDescriptor InvalidMustImplementConfigurationRule = new(
+        InvalidMustImplementConfigurationDiagnosticId,
+        "Only one non-interface MustImplementOpenGeneric constraint is allowed",
+        "Generic parameter '{0}' can declare at most one non-interface MustImplementOpenGeneric constraint",
+        "Usage",
+        DiagnosticSeverity.Error,
+        true,
+        "A generic parameter may declare multiple MustImplementOpenGeneric constraints, but only one of them may target a non-interface type definition.");
+
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        [MustImplementRule, MustNotImplementRule, MustImplementExactlyOneRule];
+        [MustImplementRule, MustNotImplementRule, MustImplementExactlyOneRule, InvalidMustImplementConfigurationRule];
 
     /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
@@ -86,7 +100,37 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
                 syntaxContext => AnalyzeGenericTypeUsage(syntaxContext, mustImplementAttributeSymbol,
                     mustNotImplementAttributeSymbol),
                 SyntaxKind.GenericName);
+
+            startContext.RegisterSymbolAction(
+                symbolContext => AnalyzeMethod(symbolContext, mustImplementAttributeSymbol),
+                SymbolKind.Method);
+
+            startContext.RegisterSymbolAction(
+                symbolContext => AnalyzeNamedType(symbolContext, mustImplementAttributeSymbol),
+                SymbolKind.NamedType);
         });
+    }
+
+    private static void AnalyzeMethod(SymbolAnalysisContext context, INamedTypeSymbol? mustImplementAttributeSymbol)
+    {
+        if (mustImplementAttributeSymbol is null)
+            return;
+
+        var method = (IMethodSymbol)context.Symbol;
+        foreach (var typeParameter in method.TypeParameters)
+            ValidateMustImplementConstraintConfiguration(typeParameter, mustImplementAttributeSymbol,
+                context.ReportDiagnostic);
+    }
+
+    private static void AnalyzeNamedType(SymbolAnalysisContext context, INamedTypeSymbol? mustImplementAttributeSymbol)
+    {
+        if (mustImplementAttributeSymbol is null)
+            return;
+
+        var namedType = (INamedTypeSymbol)context.Symbol;
+        foreach (var typeParameter in namedType.TypeParameters)
+            ValidateMustImplementConstraintConfiguration(typeParameter, mustImplementAttributeSymbol,
+                context.ReportDiagnostic);
     }
 
     private static void AnalyzeInvocation(
@@ -203,6 +247,35 @@ public sealed class MustImplementOpenGenericAnalyzer : DiagnosticAnalyzer
         }
 
         return builder.ToImmutable();
+    }
+
+    private static void ValidateMustImplementConstraintConfiguration(
+        ITypeParameterSymbol typeParameter,
+        INamedTypeSymbol attributeSymbol,
+        Action<Diagnostic> reportDiagnostic)
+    {
+        var nonInterfaceAttributes = typeParameter.GetAttributes()
+            .Where(attribute =>
+                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeSymbol) &&
+                attribute.ConstructorArguments.Length is 1 or 2 &&
+                attribute.ConstructorArguments[0].Value is INamedTypeSymbol openGenericType &&
+                openGenericType.TypeKind is not TypeKind.Interface)
+            .ToArray();
+
+        if (nonInterfaceAttributes.Length <= 1)
+            return;
+
+        foreach (var attribute in nonInterfaceAttributes.Skip(1))
+        {
+            var location = attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
+                           ?? typeParameter.Locations.FirstOrDefault()
+                           ?? Location.None;
+
+            reportDiagnostic(Diagnostic.Create(
+                InvalidMustImplementConfigurationRule,
+                location,
+                typeParameter.Name));
+        }
     }
 
     private static ImmutableArray<INamedTypeSymbol> GetMustNotImplementConstraints(

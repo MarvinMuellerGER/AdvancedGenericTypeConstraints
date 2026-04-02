@@ -9,3 +9,5 @@ OGC002 | Usage | Error | Type arguments for annotated generic parameters must no
 definition.
 OGC003 | Usage | Error | Type arguments for annotated generic parameters must match the configured open generic type
 definition exactly once.
+OGC004 | Usage | Error | A generic parameter may declare at most one non-interface MustImplementOpenGeneric
+constraint.

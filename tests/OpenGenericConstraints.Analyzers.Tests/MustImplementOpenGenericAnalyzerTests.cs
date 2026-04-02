@@ -299,6 +299,72 @@ public class MustImplementOpenGenericAnalyzerTests
         Assert.Empty(diagnostics);
     }
 
+    [Fact]
+    public async Task ReportsDiagnostic_When_MultipleMustImplementConstraintsTargetConcreteTypes()
+    {
+        const string source = """
+                              using OpenGenericConstraints;
+
+                              public class MessageHandler<TMessage> { }
+                              public class AuditHandler<TMessage> { }
+
+                              public interface IFeatureRegistry
+                              {
+                                  void Register<
+                                      [MustImplementOpenGeneric(typeof(MessageHandler<>))]
+                                      [MustImplementOpenGeneric(typeof(AuditHandler<>))]
+                                      THandler>();
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(MustImplementOpenGenericAnalyzer.InvalidMustImplementConfigurationDiagnosticId, diagnostic.Id);
+        Assert.Equal(
+            "Generic parameter 'THandler' can declare at most one non-interface MustImplementOpenGeneric constraint",
+            diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task ReportsNoDiagnostic_When_OneConcreteTypeAndMultipleInterfacesAreRequired()
+    {
+        const string source = """
+                              using OpenGenericConstraints;
+
+                              public class MessageHandler<TMessage> { }
+                              public interface IHandleMessages<TMessage> { }
+                              public interface ILogMessages<TMessage> { }
+
+                              public sealed class MyMessage { }
+
+                              public sealed class MyHandler : MessageHandler<MyMessage>, IHandleMessages<MyMessage>, ILogMessages<MyMessage>
+                              {
+                              }
+
+                              public interface IFeatureRegistry
+                              {
+                                  void Register<
+                                      [MustImplementOpenGeneric(typeof(MessageHandler<>))]
+                                      [MustImplementOpenGeneric(typeof(IHandleMessages<>))]
+                                      [MustImplementOpenGeneric(typeof(ILogMessages<>))]
+                                      THandler>();
+                              }
+
+                              public static class Demo
+                              {
+                                  public static void Run(IFeatureRegistry registry)
+                                  {
+                                      registry.Register<MyHandler>();
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
     private static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(string source)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
