@@ -22,8 +22,8 @@ Install both packages in the consuming project:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="AdvancedGenericTypeConstraints.Abstractions" Version="0.2.0" />
-  <PackageReference Include="AdvancedGenericTypeConstraints.Analyzers" Version="0.2.0" PrivateAssets="all" />
+  <PackageReference Include="AdvancedGenericTypeConstraints.Abstractions" Version="0.2.1" />
+  <PackageReference Include="AdvancedGenericTypeConstraints.Analyzers" Version="0.2.1" PrivateAssets="all" />
 </ItemGroup>
 ```
 
@@ -75,6 +75,8 @@ The analyzer currently emits these diagnostics:
 
 ## Matching semantics
 
+The analyzer validates both concrete type arguments and forwarded generic type parameters.
+
 ### Open generic checks
 
 The analyzer compares open generic type definitions, not closed constructed types.
@@ -85,10 +87,17 @@ A type counts as a match when the configured open generic type definition appear
 - any base type in its inheritance chain
 - any implemented interface
 
+If a generic method or type forwards one of its own type parameters into another constrained generic API, the
+forwarded type parameter also counts as a match when it already declares an equivalent or stricter
+`MustImplementOpenGenericAttribute` constraint.
+
 ### Attribute checks
 
 `MustHaveAttributeAttribute` checks whether the supplied type argument is directly annotated with the configured
 attribute type. Derived attributes also satisfy the rule.
+
+Forwarded generic type parameters are also accepted when they already declare the same
+`MustHaveAttributeAttribute` constraint.
 
 ### Assembly naming checks
 
@@ -115,6 +124,10 @@ You can also configure:
 - `suffix`
 - `AllowedTypes` as an explicit whitelist for legacy exceptions
 
+Forwarded generic type parameters are also accepted when they already declare an equivalent or stricter
+`MustMatchAssemblyNameOfAttribute` constraint. This allows delegating overloads and explicit interface
+implementations to pass constrained generic parameters through without needing `#pragma warning disable AGTC006`.
+
 Example:
 
 ```csharp
@@ -125,6 +138,38 @@ void RegisterServiceContract<
         AllowedTypes = new Type[] { typeof(ICelestialPostService), typeof(IOrbitalEchoStore) })]
     TService,
     TImplementation>();
+```
+
+Forwarding example:
+
+```csharp
+public interface IFeatureRegistry
+{
+    IFeatureRegistry RegisterInProcessApi<
+        [MustMatchAssemblyNameOf(nameof(TImplementation), suffix: ".Contracts")] TService,
+        TImplementation>()
+        where TService : class
+        where TImplementation : class, TService;
+}
+
+public sealed class ConfiguredFeatureRegistry : IFeatureRegistry
+{
+    public ConfiguredFeatureRegistry RegisterInProcessApi<
+        [MustMatchAssemblyNameOf(nameof(TImplementation), suffix: ".Contracts")] TService,
+        TImplementation>()
+        where TService : class
+        where TImplementation : class, TService
+    {
+        return this;
+    }
+
+    IFeatureRegistry IFeatureRegistry.RegisterInProcessApi<
+        [MustMatchAssemblyNameOf(nameof(TImplementation), suffix: ".Contracts")] TService,
+        TImplementation>()
+    {
+        return RegisterInProcessApi<TService, TImplementation>();
+    }
+}
 ```
 
 ## Non-goals

@@ -341,6 +341,74 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
     }
 
     [Fact]
+    public async Task ReportsNoDiagnostic_When_MustImplementConstraintIsForwardedThroughGenericMethod()
+    {
+        const string source = """
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IHandler<T>
+                              {
+                              }
+
+                              public interface IRegistry
+                              {
+                                  void Register<[MustImplementOpenGeneric(typeof(IHandler<>))] TService>();
+                              }
+
+                              public sealed class Registry : IRegistry
+                              {
+                                  public void Register<[MustImplementOpenGeneric(typeof(IHandler<>))] TService>()
+                                  {
+                                  }
+
+                                  void IRegistry.Register<[MustImplementOpenGeneric(typeof(IHandler<>))] TService>()
+                                  {
+                                      Register<TService>();
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsNoDiagnostic_When_MustHaveAttributeConstraintIsForwardedThroughGenericMethod()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
+                              public sealed class ServiceAttribute : Attribute
+                              {
+                              }
+
+                              public interface IRegistry
+                              {
+                                  void Register<[MustHaveAttribute(typeof(ServiceAttribute))] TService>();
+                              }
+
+                              public sealed class Registry : IRegistry
+                              {
+                                  public void Register<[MustHaveAttribute(typeof(ServiceAttribute))] TService>()
+                                  {
+                                  }
+
+                                  void IRegistry.Register<[MustHaveAttribute(typeof(ServiceAttribute))] TService>()
+                                  {
+                                      Register<TService>();
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
     public async Task ReportsNoDiagnostic_When_AssemblyNameMatchesConfiguredSuffix()
     {
         const string source = """
@@ -370,6 +438,46 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
             CreateAssemblyReference(
                 "Feature",
                 "namespace Feature { public sealed class ServiceImplementation { } }"));
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsNoDiagnostic_When_AssemblyConstraintIsForwardedThroughGenericMethod()
+    {
+        const string source = """
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IFeatureRegistry
+                              {
+                                  IFeatureRegistry RegisterInProcessApi<
+                                      [MustMatchAssemblyNameOf(nameof(TImplementation), suffix: ".Contracts")] TService,
+                                      TImplementation>()
+                                      where TService : class
+                                      where TImplementation : class, TService;
+                              }
+
+                              public sealed class ConfiguredFeatureRegistry : IFeatureRegistry
+                              {
+                                  public ConfiguredFeatureRegistry RegisterInProcessApi<
+                                      [MustMatchAssemblyNameOf(nameof(TImplementation), suffix: ".Contracts")] TService,
+                                      TImplementation>()
+                                      where TService : class
+                                      where TImplementation : class, TService
+                                  {
+                                      return this;
+                                  }
+
+                                  IFeatureRegistry IFeatureRegistry.RegisterInProcessApi<
+                                      [MustMatchAssemblyNameOf(nameof(TImplementation), suffix: ".Contracts")] TService,
+                                      TImplementation>()
+                                  {
+                                      return RegisterInProcessApi<TService, TImplementation>();
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
 
         Assert.Empty(diagnostics);
     }
