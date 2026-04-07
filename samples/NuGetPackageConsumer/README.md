@@ -1,8 +1,16 @@
 # NuGet Package Consumer
 
-This sample shows how a consuming project references the packages:
+This sample shows how a consuming project references the published NuGet packages:
 
 - `AdvancedGenericTypeConstraints.Abstractions` `0.2.0`
 - `AdvancedGenericTypeConstraints.Analyzers` `0.2.0`
 
-Build the sample and then try violating one of the declared attributes or generic rules to see the analyzer fire.
+The sample intentionally triggers each analyzer rule exactly once during build:
+
+- `AGTC001` missing required open generic
+- `AGTC002` forbidden open generic present
+- `AGTC003` required open generic matched more than once
+- `AGTC004` invalid `MustImplementOpenGeneric` configuration
+- `AGTC005` missing required attribute
+- `AGTC006` assembly naming rule violation
+- `AGTC007` invalid `MustMatchAssemblyNameOf` reference
