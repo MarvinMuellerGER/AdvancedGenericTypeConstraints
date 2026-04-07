@@ -1,5 +1,9 @@
 # AdvancedGenericTypeConstraints
 
+[![NuGet](https://img.shields.io/nuget/v/AdvancedGenericTypeConstraints.Analyzer)](https://www.nuget.org/packages/AdvancedGenericTypeConstraints.Analyzers/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub Build](https://github.com/MarvinMuellerGER/AdvancedGenericTypeConstraints/actions/workflows/publish.yml/badge.svg)](https://github.com/MarvinMuellerGER/AdvancedGenericTypeConstraints/actions/workflows/publish.yml)
+
 AdvancedGenericTypeConstraints enables compile-time-like validation for generic type rules in C# by combining lightweight
 attributes with a Roslyn analyzer.
 
