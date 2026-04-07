@@ -68,6 +68,15 @@ internal static class ConstraintDiagnostics
         true,
         "A MustMatchAssemblyNameOf constraint must reference another generic parameter or method parameter declared on the same method, or another generic parameter declared on the same type.");
 
+    public static readonly DiagnosticDescriptor MustBeOpenGenericTypeRule = new(
+        AdvancedGenericTypeConstraintAnalyzer.MustBeOpenGenericTypeDiagnosticId,
+        "Type argument must be an open generic type definition",
+        "Type '{0}' must be an open generic type definition",
+        "Usage",
+        DiagnosticSeverity.Error,
+        true,
+        "Ensures that a System.Type argument represents an open generic type definition such as IFoo<>.");
+
     public static ImmutableArray<DiagnosticDescriptor> All =>
     [
         MustImplementRule,
@@ -76,6 +85,7 @@ internal static class ConstraintDiagnostics
         InvalidMustImplementConfigurationRule,
         MustHaveAttributeRule,
         MustMatchAssemblyNameRule,
-        InvalidAssemblyConstraintConfigurationRule
+        InvalidAssemblyConstraintConfigurationRule,
+        MustBeOpenGenericTypeRule
     ];
 }

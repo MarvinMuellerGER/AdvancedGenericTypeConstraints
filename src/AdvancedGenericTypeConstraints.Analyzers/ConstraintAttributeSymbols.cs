@@ -6,7 +6,8 @@ internal readonly struct ConstraintAttributeSymbols(
     INamedTypeSymbol? mustImplementAttribute,
     INamedTypeSymbol? mustNotImplementAttribute,
     INamedTypeSymbol? mustHaveAttribute,
-    INamedTypeSymbol? mustMatchAssemblyNameOfAttribute)
+    INamedTypeSymbol? mustMatchAssemblyNameOfAttribute,
+    INamedTypeSymbol? mustBeOpenGenericTypeAttribute)
 {
     public INamedTypeSymbol? MustImplementAttribute { get; } = mustImplementAttribute;
 
@@ -16,16 +17,20 @@ internal readonly struct ConstraintAttributeSymbols(
 
     public INamedTypeSymbol? MustMatchAssemblyNameOfAttribute { get; } = mustMatchAssemblyNameOfAttribute;
 
+    public INamedTypeSymbol? MustBeOpenGenericTypeAttribute { get; } = mustBeOpenGenericTypeAttribute;
+
     public bool HasAny =>
         MustImplementAttribute is not null ||
         MustNotImplementAttribute is not null ||
         MustHaveAttribute is not null ||
-        MustMatchAssemblyNameOfAttribute is not null;
+        MustMatchAssemblyNameOfAttribute is not null ||
+        MustBeOpenGenericTypeAttribute is not null;
 
     public static ConstraintAttributeSymbols Create(Compilation compilation) =>
         new(
             compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustImplementOpenGenericAttribute"),
             compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustNotImplementOpenGenericAttribute"),
             compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustHaveAttributeAttribute"),
-            compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustMatchAssemblyNameOfAttribute"));
+            compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustMatchAssemblyNameOfAttribute"),
+            compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustBeOpenGenericTypeAttribute"));
 }

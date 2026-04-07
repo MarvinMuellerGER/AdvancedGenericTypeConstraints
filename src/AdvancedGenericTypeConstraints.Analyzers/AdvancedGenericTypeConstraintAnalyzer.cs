@@ -48,6 +48,11 @@ public sealed class AdvancedGenericTypeConstraintAnalyzer : DiagnosticAnalyzer
     /// </summary>
     public const string InvalidAssemblyConstraintConfigurationDiagnosticId = "AGTC007";
 
+    /// <summary>
+    /// Diagnostic emitted when a <see cref="Type"/> argument is not an open generic type definition.
+    /// </summary>
+    public const string MustBeOpenGenericTypeDiagnosticId = "AGTC008";
+
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ConstraintDiagnostics.All;
 

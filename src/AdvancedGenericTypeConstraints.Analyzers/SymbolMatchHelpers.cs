@@ -33,6 +33,11 @@ internal static class SymbolMatchHelpers
     public static bool IsWhitelistedType(ITypeSymbol typeArgument, ImmutableArray<INamedTypeSymbol> allowedTypes) =>
         allowedTypes.Any(allowedType => SymbolEqualityComparer.Default.Equals(typeArgument, allowedType));
 
+    public static bool IsOpenGenericTypeDefinition(ITypeSymbol typeSymbol) =>
+        typeSymbol is INamedTypeSymbol { IsGenericType: true } namedType &&
+        (namedType.IsUnboundGenericType ||
+         SymbolEqualityComparer.Default.Equals(namedType, namedType.OriginalDefinition));
+
     public static string ToOpenGenericDisplayString(INamedTypeSymbol openGenericType) => openGenericType
         .ConstructUnboundGenericType().ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
 

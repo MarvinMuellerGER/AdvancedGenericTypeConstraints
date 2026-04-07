@@ -10,7 +10,8 @@ internal static class InvocationParameterConstraintValidator
         Action<Diagnostic> reportDiagnostic,
         ConstraintAttributeSymbols symbols)
     {
-        if (symbols.MustMatchAssemblyNameOfAttribute is null)
+        if (symbols.MustMatchAssemblyNameOfAttribute is null &&
+            symbols.MustBeOpenGenericTypeAttribute is null)
             return;
 
         var argumentsByParameter = invocation.Arguments
@@ -25,6 +26,8 @@ internal static class InvocationParameterConstraintValidator
             var typeArgument = TryGetRepresentedType(argument.Value);
             if (typeArgument is null)
                 continue;
+
+            ValidateMustBeOpenGenericType(parameter, typeArgument, argument, reportDiagnostic, symbols);
 
             foreach (var assemblyConstraint in ConstraintReaders.GetAssemblyNameConstraints(
                          parameter,
@@ -60,6 +63,29 @@ internal static class InvocationParameterConstraintValidator
                     SymbolMatchHelpers.ToMinimalDisplayString(otherTypeArgument)));
             }
         }
+    }
+
+    private static void ValidateMustBeOpenGenericType(
+        IParameterSymbol parameter,
+        ITypeSymbol typeArgument,
+        IArgumentOperation argument,
+        Action<Diagnostic> reportDiagnostic,
+        ConstraintAttributeSymbols symbols)
+    {
+        if (symbols.MustBeOpenGenericTypeAttribute is null)
+            return;
+
+        if (!parameter.GetAttributes().Any(attribute =>
+                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, symbols.MustBeOpenGenericTypeAttribute)))
+            return;
+
+        if (SymbolMatchHelpers.IsOpenGenericTypeDefinition(typeArgument))
+            return;
+
+        reportDiagnostic(Diagnostic.Create(
+            ConstraintDiagnostics.MustBeOpenGenericTypeRule,
+            argument.Syntax.GetLocation(),
+            SymbolMatchHelpers.ToMinimalDisplayString(typeArgument)));
     }
 
     private static ITypeSymbol? TryGetRepresentedType(IOperation operation)

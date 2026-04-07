@@ -60,6 +60,7 @@ The current API supports:
 - `MustNotImplementOpenGenericAttribute`
 - `MustHaveAttributeAttribute`
 - `MustMatchAssemblyNameOfAttribute`
+- `MustBeOpenGenericTypeAttribute`
 
 ## Diagnostic IDs
 
@@ -72,6 +73,7 @@ The analyzer currently emits these diagnostics:
 - `AGTC005`: required attribute is missing
 - `AGTC006`: assembly naming rule between two related types is violated
 - `AGTC007`: `MustMatchAssemblyNameOf` references an invalid related parameter
+- `AGTC008`: a `Type` argument is not an open generic type definition
 
 ## Matching semantics
 
@@ -148,6 +150,27 @@ implementations to pass constrained generic parameters through without needing `
 
 The same applies when a generic overload forwards into a `Type`-based overload via `typeof(TService)` and
 `typeof(TImplementation)`.
+
+### Open generic `Type` checks
+
+`MustBeOpenGenericTypeAttribute` applies to method parameters of type `System.Type`.
+
+It requires statically analyzable call sites to pass an open generic type definition such as `typeof(IFoo<>)` or
+`typeof(Foo<>)`.
+
+Example:
+
+```csharp
+void RegisterInProcessApi(
+    [MustBeOpenGenericType] Type serviceType,
+    [MustBeOpenGenericType] Type implementationType);
+```
+
+```csharp
+featureRegistry.RegisterInProcessApi(
+    serviceType: typeof(ISendResetSalesOrderSurchargesCommandService<>),
+    implementationType: typeof(SendResetSalesOrderSurchargesCommandService<>));
+```
 
 Example:
 

@@ -14,3 +14,4 @@ The sample intentionally triggers each analyzer rule exactly once during build:
 - `AGTC005` missing required attribute
 - `AGTC006` assembly naming rule violation
 - `AGTC007` invalid `MustMatchAssemblyNameOf` related-parameter reference
+- `AGTC008` `Type` argument is not an open generic type definition

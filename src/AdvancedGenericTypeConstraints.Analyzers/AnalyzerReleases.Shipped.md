@@ -10,3 +10,10 @@ AGTC004 | Usage | Error | A generic parameter may declare at most one non-interf
 AGTC005 | Usage | Error | Type arguments for annotated generic parameters must be annotated with the configured attribute.
 AGTC006 | Usage | Error | Type arguments for annotated generic parameters must belong to an assembly whose name matches another type argument's assembly according to the configured prefix and suffix.
 AGTC007 | Usage | Error | A MustMatchAssemblyNameOf constraint must reference another generic parameter on the same type or method.
+
+## Release 0.2.1
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+AGTC008 | Usage | Error | Type values passed to parameters annotated with MustBeOpenGenericType must be open generic type definitions.

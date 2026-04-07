@@ -557,6 +557,100 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
     }
 
     [Fact]
+    public async Task ReportsNoDiagnostic_When_TypeParameterIsAnOpenGenericTypeDefinition()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface ICommandService<T>
+                              {
+                              }
+
+                              public interface IFeatureRegistry
+                              {
+                                  void Register([MustBeOpenGenericType] Type serviceType);
+                              }
+
+                              public static class Demo
+                              {
+                                  public static void Run(IFeatureRegistry featureRegistry)
+                                  {
+                                      featureRegistry.Register(typeof(ICommandService<>));
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsDiagnostic_When_TypeParameterIsAClosedGenericType()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface ICommandService<T>
+                              {
+                              }
+
+                              public sealed class Command
+                              {
+                              }
+
+                              public interface IFeatureRegistry
+                              {
+                                  void Register([MustBeOpenGenericType] Type serviceType);
+                              }
+
+                              public static class Demo
+                              {
+                                  public static void Run(IFeatureRegistry featureRegistry)
+                                  {
+                                      featureRegistry.Register(typeof(ICommandService<Command>));
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AdvancedGenericTypeConstraintAnalyzer.MustBeOpenGenericTypeDiagnosticId, diagnostic.Id);
+        Assert.Equal("Type 'ICommandService<Command>' must be an open generic type definition", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task ReportsDiagnostic_When_TypeParameterIsNotGeneric()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IFeatureRegistry
+                              {
+                                  void Register([MustBeOpenGenericType] Type serviceType);
+                              }
+
+                              public static class Demo
+                              {
+                                  public static void Run(IFeatureRegistry featureRegistry)
+                                  {
+                                      featureRegistry.Register(typeof(string));
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AdvancedGenericTypeConstraintAnalyzer.MustBeOpenGenericTypeDiagnosticId, diagnostic.Id);
+        Assert.Equal("Type 'string' must be an open generic type definition", diagnostic.GetMessage());
+    }
+
+    [Fact]
     public async Task ReportsNoDiagnostic_When_TypeParameterAssemblyConstraintIsSatisfiedViaGenericForwarding()
     {
         const string source = """
