@@ -2,8 +2,8 @@
 
 This sample shows how a consuming project references the published NuGet packages:
 
-- `AdvancedGenericTypeConstraints.Abstractions` `0.2.1`
-- `AdvancedGenericTypeConstraints.Analyzers` `0.2.1`
+- `AdvancedGenericTypeConstraints.Abstractions` `0.2.2`
+- `AdvancedGenericTypeConstraints.Analyzers` `0.2.2`
 
 The sample intentionally triggers each analyzer rule exactly once during build:
 

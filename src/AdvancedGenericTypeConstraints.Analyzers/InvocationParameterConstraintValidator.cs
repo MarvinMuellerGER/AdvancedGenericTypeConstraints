@@ -42,8 +42,34 @@ internal static class InvocationParameterConstraintValidator
                     SymbolMatchHelpers.IsWhitelistedType(typeArgument, assemblyConstraint.AllowedTypes))
                     continue;
 
-                if (typeArgument is null || otherTypeArgument is null ||
-                    HasEquivalentOrStrongerAssemblyConstraint(argument, otherArgument, assemblyConstraint, symbols))
+                if (typeArgument is null || otherTypeArgument is null)
+                {
+                    if (HasEquivalentOrStrongerAssemblyConstraint(argument, otherArgument, assemblyConstraint, symbols))
+                        continue;
+
+                    var forwardedParameter = TryGetForwardedParameter(argument.Value);
+                    var forwardedOtherParameter = TryGetForwardedParameter(otherArgument.Value);
+                    reportDiagnostic(Diagnostic.Create(
+                        ConstraintDiagnostics.MustMatchAssemblyNameRule,
+                        argument.Syntax.GetLocation(),
+                        typeArgument is null
+                            ? forwardedParameter?.Name ?? parameter.Name
+                            : SymbolMatchHelpers.ToMinimalDisplayString(typeArgument),
+                        otherTypeArgument is null
+                            ? FormatExpectedAssemblyName(
+                                forwardedOtherParameter?.Name ?? otherParameter.Name,
+                                assemblyConstraint)
+                            : assemblyConstraint.Prefix +
+                              SymbolMatchHelpers.GetAssemblySimpleName(otherTypeArgument.ContainingAssembly) +
+                              assemblyConstraint.Suffix,
+                        otherTypeArgument is null
+                            ? forwardedOtherParameter?.Name ?? otherParameter.Name
+                            : SymbolMatchHelpers.ToMinimalDisplayString(otherTypeArgument)));
+
+                    continue;
+                }
+
+                if (HasEquivalentOrStrongerAssemblyConstraint(argument, otherArgument, assemblyConstraint, symbols))
                     continue;
 
                 var expectedAssemblyName = assemblyConstraint.Prefix +
@@ -161,6 +187,11 @@ internal static class InvocationParameterConstraintValidator
         Enumerable.All(candidateAllowedTypes,
             candidateAllowedType => requiredAllowedTypes.Any(requiredAllowedType =>
                 SymbolEqualityComparer.Default.Equals(candidateAllowedType, requiredAllowedType)));
+
+    private static string FormatExpectedAssemblyName(
+        string otherParameterName,
+        AssemblyNameConstraint requiredConstraint) =>
+        requiredConstraint.Prefix + "{AssemblyOf(" + otherParameterName + ")}" + requiredConstraint.Suffix;
 
     private static IParameterSymbol? TryGetForwardedParameter(IOperation operation)
     {

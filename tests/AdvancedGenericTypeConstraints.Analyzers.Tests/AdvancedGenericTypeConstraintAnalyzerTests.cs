@@ -755,6 +755,83 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
     }
 
     [Fact]
+    public async Task ReportsDiagnostic_When_TypeParameterAssemblyConstraintIsForwardedWithoutEquivalentConstraint()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IFeatureRegistry
+                              {
+                                  IFeatureRegistry RegisterInProcessApi(
+                                      [MustBeOpenGenericType] Type serviceType,
+                                      [MustBeOpenGenericType] Type implementationType);
+                              }
+
+                              public sealed class ConfiguredFeatureRegistry : IFeatureRegistry
+                              {
+                                  IFeatureRegistry IFeatureRegistry.RegisterInProcessApi(
+                                      [MustBeOpenGenericType] Type serviceType,
+                                      [MustBeOpenGenericType] Type implementationType)
+                                  {
+                                      return RegisterInProcessApi(serviceType, implementationType);
+                                  }
+
+                                  public ConfiguredFeatureRegistry RegisterInProcessApi(
+                                      [MustBeOpenGenericType]
+                                      [MustMatchAssemblyNameOf(nameof(implementationType), suffix: ".Contracts")] Type serviceType,
+                                      [MustBeOpenGenericType] Type implementationType)
+                                  {
+                                      return this;
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AdvancedGenericTypeConstraintAnalyzer.MustMatchAssemblyNameDiagnosticId, diagnostic.Id);
+        Assert.Equal(
+            "Type 'serviceType' must be declared in assembly '{AssemblyOf(implementationType)}.Contracts' to match type 'implementationType'",
+            diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task ReportsDiagnostic_When_OnlyRelatedTypeParameterIsForwardedWithoutEquivalentConstraint()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public sealed class FeatureRegistry
+                              {
+                                  public void RegisterInProcessApi(
+                                      [MustMatchAssemblyNameOf(nameof(implementationType), suffix: ".Contracts")] Type serviceType,
+                                      Type implementationType)
+                                  {
+                                  }
+
+                                  public void Forward(Type implementationType)
+                                  {
+                                      RegisterInProcessApi(typeof(Service.Contracts.IService<>), implementationType);
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(
+            source,
+            CreateAssemblyReference(
+                "Service.Contracts",
+                "namespace Service.Contracts { public interface IService<T> { } }"));
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AdvancedGenericTypeConstraintAnalyzer.MustMatchAssemblyNameDiagnosticId, diagnostic.Id);
+        Assert.Equal(
+            "Type 'IService<>' must be declared in assembly '{AssemblyOf(implementationType)}.Contracts' to match type 'implementationType'",
+            diagnostic.GetMessage());
+    }
+
+    [Fact]
     public async Task ReportsDiagnostic_When_AssemblyNameDoesNotMatchConfiguredSuffix()
     {
         const string source = """
