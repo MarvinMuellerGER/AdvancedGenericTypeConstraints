@@ -77,6 +77,33 @@ internal static class ConstraintDiagnostics
         true,
         "Ensures that a System.Type argument represents an open generic type definition such as IFoo<>.");
 
+    public static readonly DiagnosticDescriptor MustBeReferenceTypeRule = new(
+        AdvancedGenericTypeConstraintAnalyzer.MustBeReferenceTypeDiagnosticId,
+        "Type argument must be a reference type",
+        "Type '{0}' must be a reference type",
+        "Usage",
+        DiagnosticSeverity.Error,
+        true,
+        "Ensures that a System.Type argument represents a reference type.");
+
+    public static readonly DiagnosticDescriptor MustBeAssignableToRule = new(
+        AdvancedGenericTypeConstraintAnalyzer.MustBeAssignableToDiagnosticId,
+        "Type argument must be assignable to the related type",
+        "Type '{0}' must be assignable to type '{1}'",
+        "Usage",
+        DiagnosticSeverity.Error,
+        true,
+        "Ensures that a System.Type argument is assignable to another related System.Type argument.");
+
+    public static readonly DiagnosticDescriptor InvalidAssignableToConstraintConfigurationRule = new(
+        AdvancedGenericTypeConstraintAnalyzer.InvalidAssignableToConstraintConfigurationDiagnosticId,
+        "The assignability constraint references an invalid related parameter",
+        "Parameter '{0}' references invalid related parameter '{1}'",
+        "Usage",
+        DiagnosticSeverity.Error,
+        true,
+        "A MustBeAssignableTo constraint must reference another System.Type method parameter on the same method.");
+
     public static ImmutableArray<DiagnosticDescriptor> All =>
     [
         MustImplementRule,
@@ -86,6 +113,9 @@ internal static class ConstraintDiagnostics
         MustHaveAttributeRule,
         MustMatchAssemblyNameRule,
         InvalidAssemblyConstraintConfigurationRule,
-        MustBeOpenGenericTypeRule
+        MustBeOpenGenericTypeRule,
+        MustBeReferenceTypeRule,
+        MustBeAssignableToRule,
+        InvalidAssignableToConstraintConfigurationRule
     ];
 }

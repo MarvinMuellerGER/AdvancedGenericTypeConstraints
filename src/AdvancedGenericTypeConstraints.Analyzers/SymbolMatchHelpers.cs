@@ -38,6 +38,39 @@ internal static class SymbolMatchHelpers
         (namedType.IsUnboundGenericType ||
          SymbolEqualityComparer.Default.Equals(namedType, namedType.OriginalDefinition));
 
+    public static bool IsReferenceType(ITypeSymbol typeSymbol) => !typeSymbol.IsValueType;
+
+    public static bool IsAssignableTo(ITypeSymbol sourceType, ITypeSymbol targetType)
+    {
+        if (SymbolEqualityComparer.Default.Equals(sourceType, targetType))
+            return true;
+
+        if (sourceType is not INamedTypeSymbol sourceNamedType || targetType is not INamedTypeSymbol targetNamedType)
+            return false;
+
+        if (targetNamedType.IsGenericType)
+        {
+            var targetOpenGeneric = targetNamedType.OriginalDefinition;
+            if (CountMatches(GetAllMatchingOpenGenerics(sourceType), targetOpenGeneric) > 0)
+                return true;
+
+            if (sourceNamedType.IsUnboundGenericType &&
+                CountMatches(GetAllMatchingOpenGenerics(sourceNamedType.OriginalDefinition), targetOpenGeneric) > 0)
+                return true;
+        }
+
+        var normalizedTarget = NormalizeForAssignability(targetNamedType);
+        if (SymbolEqualityComparer.Default.Equals(NormalizeForAssignability(sourceNamedType), normalizedTarget))
+            return true;
+
+        for (var baseType = sourceNamedType.BaseType; baseType is not null; baseType = baseType.BaseType)
+            if (SymbolEqualityComparer.Default.Equals(NormalizeForAssignability(baseType), normalizedTarget))
+                return true;
+
+        return sourceType.AllInterfaces.Any(implementedInterface =>
+            SymbolEqualityComparer.Default.Equals(NormalizeForAssignability(implementedInterface), normalizedTarget));
+    }
+
     public static string ToOpenGenericDisplayString(INamedTypeSymbol openGenericType) => openGenericType
         .ConstructUnboundGenericType().ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
 
@@ -62,4 +95,7 @@ internal static class SymbolMatchHelpers
         if (namedType.IsGenericType)
             builder.Add(namedType.OriginalDefinition);
     }
+
+    private static INamedTypeSymbol NormalizeForAssignability(INamedTypeSymbol namedType) =>
+        namedType.IsGenericType ? namedType.OriginalDefinition : namedType;
 }

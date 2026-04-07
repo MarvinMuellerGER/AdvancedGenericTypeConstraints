@@ -17,3 +17,11 @@ AGTC007 | Usage | Error | A MustMatchAssemblyNameOf constraint must reference an
 
 Rule ID | Category | Severity | Notes
 AGTC008 | Usage | Error | Type values passed to parameters annotated with MustBeOpenGenericType must be open generic type definitions.
+
+## Release 0.3.0
+
+### New Rules
+
+AGTC009 | Usage | Error | Type values passed to parameters annotated with MustBeReferenceType must represent reference types.
+AGTC010 | Usage | Error | Type values passed to parameters annotated with MustBeAssignableTo must be assignable to the related type parameter.
+AGTC011 | Usage | Error | A MustBeAssignableTo constraint must reference another System.Type method parameter on the same method.

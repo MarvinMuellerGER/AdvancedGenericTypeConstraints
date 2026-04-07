@@ -24,3 +24,8 @@ internal readonly struct AssemblyNameConstraint(
 
     public ImmutableArray<INamedTypeSymbol> AllowedTypes { get; } = allowedTypes;
 }
+
+internal readonly struct AssignableToConstraint(string otherParameterName)
+{
+    public string OtherParameterName { get; } = otherParameterName;
+}

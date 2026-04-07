@@ -61,6 +61,8 @@ The current API supports:
 - `MustHaveAttributeAttribute`
 - `MustMatchAssemblyNameOfAttribute`
 - `MustBeOpenGenericTypeAttribute`
+- `MustBeReferenceTypeAttribute`
+- `MustBeAssignableToAttribute`
 
 ## Diagnostic IDs
 
@@ -74,6 +76,9 @@ The analyzer currently emits these diagnostics:
 - `AGTC006`: assembly naming rule between two related types is violated
 - `AGTC007`: `MustMatchAssemblyNameOf` references an invalid related parameter
 - `AGTC008`: a `Type` argument is not an open generic type definition
+- `AGTC009`: a `Type` argument is not a reference type
+- `AGTC010`: a `Type` argument is not assignable to another related `Type` argument
+- `AGTC011`: `MustBeAssignableTo` references an invalid related parameter
 
 ## Matching semantics
 
@@ -170,6 +175,36 @@ void RegisterInProcessApi(
 featureRegistry.RegisterInProcessApi(
     serviceType: typeof(ISendResetSalesOrderSurchargesCommandService<>),
     implementationType: typeof(SendResetSalesOrderSurchargesCommandService<>));
+```
+
+### Reference-type and assignability `Type` checks
+
+`MustBeReferenceTypeAttribute` and `MustBeAssignableToAttribute` also apply to method parameters of type `System.Type`.
+
+They let `Type`-based APIs express the same intent as:
+
+```csharp
+where TService : class
+where TImplementation : class, TService
+```
+
+Example:
+
+```csharp
+void RegisterInProcessApi(
+    [MustBeOpenGenericType]
+    [MustBeReferenceType]
+    Type serviceType,
+    [MustBeOpenGenericType]
+    [MustBeReferenceType]
+    [MustBeAssignableTo(nameof(serviceType))]
+    Type implementationType);
+```
+
+```csharp
+featureRegistry.RegisterInProcessApi(
+    serviceType: typeof(ISendUpdateWarehouseDeliverySalesCommandService<>),
+    implementationType: typeof(SendUpdateWarehouseDeliverySalesCommandService<>));
 ```
 
 Example:

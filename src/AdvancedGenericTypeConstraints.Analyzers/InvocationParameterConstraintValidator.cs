@@ -12,13 +12,17 @@ internal static class InvocationParameterConstraintValidator
         ConstraintAttributeSymbols symbols)
     {
         if (symbols.MustMatchAssemblyNameOfAttribute is null &&
-            symbols.MustBeOpenGenericTypeAttribute is null)
+            symbols.MustBeOpenGenericTypeAttribute is null &&
+            symbols.MustBeReferenceTypeAttribute is null &&
+            symbols.MustBeAssignableToAttribute is null)
             return;
 
-        var argumentsByParameter = invocation.Arguments
-            .Where(static argument => argument.Parameter is not null)
-            .ToDictionary(static argument => argument.Parameter!, static argument => argument,
-                SymbolEqualityComparer.Default);
+        var argumentsByParameter = new Dictionary<ISymbol, IArgumentOperation>(SymbolEqualityComparer.Default);
+        foreach (var invocationArgument in invocation.Arguments)
+        {
+            if (invocationArgument.Parameter is not null)
+                argumentsByParameter[invocationArgument.Parameter] = invocationArgument;
+        }
 
         foreach (var parameter in invocation.TargetMethod.Parameters)
         {
@@ -27,6 +31,15 @@ internal static class InvocationParameterConstraintValidator
 
             var typeArgument = TryGetRepresentedType(argument.Value);
             ValidateMustBeOpenGenericType(parameter, typeArgument, argument, reportDiagnostic, symbols);
+            ValidateMustBeReferenceType(parameter, typeArgument, argument, reportDiagnostic, symbols);
+            ValidateMustBeAssignableTo(
+                invocation,
+                parameter,
+                typeArgument,
+                argument,
+                argumentsByParameter,
+                reportDiagnostic,
+                symbols);
 
             foreach (var assemblyConstraint in ConstraintReaders.GetAssemblyNameConstraints(
                          parameter,
@@ -125,6 +138,82 @@ internal static class InvocationParameterConstraintValidator
                 : SymbolMatchHelpers.ToMinimalDisplayString(typeArgument)));
     }
 
+    private static void ValidateMustBeReferenceType(
+        IParameterSymbol parameter,
+        ITypeSymbol? typeArgument,
+        IArgumentOperation argument,
+        Action<Diagnostic> reportDiagnostic,
+        ConstraintAttributeSymbols symbols)
+    {
+        if (symbols.MustBeReferenceTypeAttribute is null)
+            return;
+
+        if (!parameter.GetAttributes().Any(attribute =>
+                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, symbols.MustBeReferenceTypeAttribute)))
+            return;
+
+        if (typeArgument is not null && SymbolMatchHelpers.IsReferenceType(typeArgument))
+            return;
+
+        if (HasEquivalentAttribute(argument.Value, symbols.MustBeReferenceTypeAttribute))
+            return;
+
+        reportDiagnostic(Diagnostic.Create(
+            ConstraintDiagnostics.MustBeReferenceTypeRule,
+            argument.Syntax.GetLocation(),
+            typeArgument is null
+                ? parameter.Name
+                : SymbolMatchHelpers.ToMinimalDisplayString(typeArgument)));
+    }
+
+    private static void ValidateMustBeAssignableTo(
+        IInvocationOperation invocation,
+        IParameterSymbol parameter,
+        ITypeSymbol? typeArgument,
+        IArgumentOperation argument,
+        IReadOnlyDictionary<ISymbol, IArgumentOperation> argumentsByParameter,
+        Action<Diagnostic> reportDiagnostic,
+        ConstraintAttributeSymbols symbols)
+    {
+        foreach (var assignableConstraint in ConstraintReaders.GetAssignableToConstraints(
+                     parameter,
+                     symbols.MustBeAssignableToAttribute))
+        {
+            var otherParameter = invocation.TargetMethod.Parameters.FirstOrDefault(candidate =>
+                string.Equals(candidate.Name, assignableConstraint.OtherParameterName, StringComparison.Ordinal));
+            if (otherParameter is null || !argumentsByParameter.TryGetValue(otherParameter, out var otherArgument))
+                continue;
+
+            var otherTypeArgument = TryGetRepresentedType(otherArgument.Value);
+            if (typeArgument is not null && otherTypeArgument is not null)
+            {
+                if (SymbolMatchHelpers.IsAssignableTo(typeArgument, otherTypeArgument))
+                    continue;
+
+                reportDiagnostic(Diagnostic.Create(
+                    ConstraintDiagnostics.MustBeAssignableToRule,
+                    argument.Syntax.GetLocation(),
+                    SymbolMatchHelpers.ToMinimalDisplayString(typeArgument),
+                    SymbolMatchHelpers.ToMinimalDisplayString(otherTypeArgument)));
+
+                continue;
+            }
+
+            if (HasEquivalentOrStrongerAssignableToConstraint(argument, otherArgument, symbols))
+                continue;
+
+            reportDiagnostic(Diagnostic.Create(
+                ConstraintDiagnostics.MustBeAssignableToRule,
+                argument.Syntax.GetLocation(),
+                typeArgument is null
+                    ? TryGetForwardedParameter(argument.Value)?.Name ?? parameter.Name
+                    : SymbolMatchHelpers.ToMinimalDisplayString(typeArgument),
+                otherTypeArgument is null
+                    ? TryGetForwardedParameter(otherArgument.Value)?.Name ?? otherParameter.Name
+                    : SymbolMatchHelpers.ToMinimalDisplayString(otherTypeArgument)));
+        }
+    }
+
     private static ITypeSymbol? TryGetRepresentedType(IOperation operation)
     {
         while (operation is IConversionOperation { IsImplicit: true } conversion)
@@ -144,11 +233,7 @@ internal static class InvocationParameterConstraintValidator
         if (symbols.MustBeOpenGenericTypeAttribute is null)
             return false;
 
-        var forwardedParameter = TryGetForwardedParameter(operation);
-        return forwardedParameter is not null &&
-               forwardedParameter.GetAttributes().Any(attribute =>
-                   SymbolEqualityComparer.Default.Equals(attribute.AttributeClass,
-                       symbols.MustBeOpenGenericTypeAttribute));
+        return HasEquivalentAttribute(operation, symbols.MustBeOpenGenericTypeAttribute);
     }
 
     private static bool HasEquivalentOrStrongerAssemblyConstraint(
@@ -188,10 +273,35 @@ internal static class InvocationParameterConstraintValidator
             candidateAllowedType => requiredAllowedTypes.Any(requiredAllowedType =>
                 SymbolEqualityComparer.Default.Equals(candidateAllowedType, requiredAllowedType)));
 
+    private static bool HasEquivalentOrStrongerAssignableToConstraint(
+        IArgumentOperation argument,
+        IArgumentOperation otherArgument,
+        ConstraintAttributeSymbols symbols)
+    {
+        if (symbols.MustBeAssignableToAttribute is null)
+            return false;
+
+        var forwardedParameter = TryGetForwardedParameter(argument.Value);
+        var forwardedOtherParameter = TryGetForwardedParameter(otherArgument.Value);
+        if (forwardedParameter is null || forwardedOtherParameter is null)
+            return false;
+
+        return ConstraintReaders.GetAssignableToConstraints(forwardedParameter, symbols.MustBeAssignableToAttribute)
+            .Any(candidate => string.Equals(candidate.OtherParameterName, forwardedOtherParameter.Name, StringComparison.Ordinal));
+    }
+
     private static string FormatExpectedAssemblyName(
         string otherParameterName,
         AssemblyNameConstraint requiredConstraint) =>
         requiredConstraint.Prefix + "{AssemblyOf(" + otherParameterName + ")}" + requiredConstraint.Suffix;
+
+    private static bool HasEquivalentAttribute(IOperation operation, INamedTypeSymbol attributeSymbol)
+    {
+        var forwardedParameter = TryGetForwardedParameter(operation);
+        return forwardedParameter is not null &&
+               forwardedParameter.GetAttributes().Any(attribute =>
+                   SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeSymbol));
+    }
 
     private static IParameterSymbol? TryGetForwardedParameter(IOperation operation)
     {

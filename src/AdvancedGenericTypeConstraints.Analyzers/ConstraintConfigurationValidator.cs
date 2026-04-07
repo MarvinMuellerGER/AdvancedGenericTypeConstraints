@@ -12,13 +12,17 @@ internal static class ConstraintConfigurationValidator
     {
         Validate(method.TypeParameters, symbols, reportDiagnostic);
 
-        if (symbols.MustMatchAssemblyNameOfAttribute is null)
-            return;
+        if (symbols.MustMatchAssemblyNameOfAttribute is not null)
+            ValidateAssemblyConstraintConfiguration(
+                method.Parameters,
+                symbols.MustMatchAssemblyNameOfAttribute,
+                reportDiagnostic);
 
-        ValidateAssemblyConstraintConfiguration(
-            method.Parameters,
-            symbols.MustMatchAssemblyNameOfAttribute,
-            reportDiagnostic);
+        if (symbols.MustBeAssignableToAttribute is not null)
+            ValidateAssignableToConstraintConfiguration(
+                method.Parameters,
+                symbols.MustBeAssignableToAttribute,
+                reportDiagnostic);
     }
 
     public static void Validate(
@@ -121,8 +125,44 @@ internal static class ConstraintConfigurationValidator
                     ConstraintDiagnostics.InvalidAssemblyConstraintConfigurationRule,
                     GetAttributeLocation(attribute, typeParameter),
                     typeParameter.Name,
-                    otherTypeParameterName));
+                otherTypeParameterName));
             }
+        }
+    }
+
+    private static void ValidateAssignableToConstraintConfiguration(
+        ImmutableArray<IParameterSymbol> parameters,
+        INamedTypeSymbol attributeSymbol,
+        Action<Diagnostic> reportDiagnostic)
+    {
+        var availableNames = new HashSet<string>(
+            parameters.Select(static parameter => parameter.Name),
+            StringComparer.Ordinal);
+
+        foreach (var parameter in parameters)
+        foreach (var constraint in ConstraintReaders.GetAssignableToConstraints(parameter, attributeSymbol))
+        {
+            var otherParameterName = constraint.OtherParameterName;
+            var isInvalidReference = string.Equals(otherParameterName, parameter.Name, StringComparison.Ordinal) ||
+                                     !availableNames.Contains(otherParameterName);
+            var isInvalidTypeUsage = !IsSystemType(parameter.Type) ||
+                                     !parameters.Any(candidate =>
+                                         string.Equals(candidate.Name, otherParameterName, StringComparison.Ordinal) &&
+                                         IsSystemType(candidate.Type));
+
+            if (!isInvalidReference && !isInvalidTypeUsage)
+                continue;
+
+            var attribute = parameter.GetAttributes().First(current =>
+                SymbolEqualityComparer.Default.Equals(current.AttributeClass, attributeSymbol) &&
+                current.ConstructorArguments.Length is 1 &&
+                string.Equals(current.ConstructorArguments[0].Value as string, otherParameterName, StringComparison.Ordinal));
+
+            reportDiagnostic(Diagnostic.Create(
+                ConstraintDiagnostics.InvalidAssignableToConstraintConfigurationRule,
+                GetAttributeLocation(attribute, parameter),
+                parameter.Name,
+                otherParameterName));
         }
     }
 

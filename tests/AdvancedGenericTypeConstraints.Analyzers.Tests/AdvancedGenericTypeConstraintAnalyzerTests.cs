@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using AdvancedGenericTypeConstraints;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -651,6 +650,134 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
     }
 
     [Fact]
+    public async Task ReportsNoDiagnostic_When_TypeParameterIsAReferenceType()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IFeatureRegistry
+                              {
+                                  void Register([MustBeReferenceType] Type serviceType);
+                              }
+
+                              public static class Demo
+                              {
+                                  public static void Run(IFeatureRegistry featureRegistry)
+                                  {
+                                      featureRegistry.Register(typeof(string));
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsDiagnostic_When_TypeParameterIsNotAReferenceType()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IFeatureRegistry
+                              {
+                                  void Register([MustBeReferenceType] Type serviceType);
+                              }
+
+                              public static class Demo
+                              {
+                                  public static void Run(IFeatureRegistry featureRegistry)
+                                  {
+                                      featureRegistry.Register(typeof(int));
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AdvancedGenericTypeConstraintAnalyzer.MustBeReferenceTypeDiagnosticId, diagnostic.Id);
+        Assert.Equal("Type 'int' must be a reference type", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task ReportsNoDiagnostic_When_TypeParameterIsAssignableToRelatedType()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IService<T>
+                              {
+                              }
+
+                              public sealed class Implementation<T> : IService<T>
+                              {
+                              }
+
+                              public interface IFeatureRegistry
+                              {
+                                  void Register(
+                                      Type serviceType,
+                                      [MustBeAssignableTo(nameof(serviceType))] Type implementationType);
+                              }
+
+                              public static class Demo
+                              {
+                                  public static void Run(IFeatureRegistry featureRegistry)
+                                  {
+                                      featureRegistry.Register(typeof(IService<>), typeof(Implementation<>));
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsDiagnostic_When_TypeParameterIsNotAssignableToRelatedType()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IService<T>
+                              {
+                              }
+
+                              public sealed class OtherService<T>
+                              {
+                              }
+
+                              public interface IFeatureRegistry
+                              {
+                                  void Register(
+                                      Type serviceType,
+                                      [MustBeAssignableTo(nameof(serviceType))] Type implementationType);
+                              }
+
+                              public static class Demo
+                              {
+                                  public static void Run(IFeatureRegistry featureRegistry)
+                                  {
+                                      featureRegistry.Register(typeof(IService<>), typeof(OtherService<>));
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AdvancedGenericTypeConstraintAnalyzer.MustBeAssignableToDiagnosticId, diagnostic.Id);
+        Assert.Equal("Type 'OtherService<>' must be assignable to type 'IService<>'", diagnostic.GetMessage());
+    }
+
+    [Fact]
     public async Task ReportsNoDiagnostic_When_OpenGenericTypeConstraintIsForwardedThroughTypeParameter()
     {
         const string source = """
@@ -671,6 +798,60 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
                                   public void Forward([MustBeOpenGenericType] Type serviceType)
                                   {
                                       Register(serviceType);
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsNoDiagnostic_When_ReferenceTypeConstraintIsForwardedThroughTypeParameter()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public sealed class FeatureRegistry
+                              {
+                                  public void Register([MustBeReferenceType] Type serviceType)
+                                  {
+                                  }
+
+                                  public void Forward([MustBeReferenceType] Type serviceType)
+                                  {
+                                      Register(serviceType);
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsNoDiagnostic_When_AssignableToConstraintIsForwardedThroughTypeParameters()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public sealed class FeatureRegistry
+                              {
+                                  public void Register(
+                                      Type serviceType,
+                                      [MustBeAssignableTo(nameof(serviceType))] Type implementationType)
+                                  {
+                                  }
+
+                                  public void Forward(
+                                      Type serviceType,
+                                      [MustBeAssignableTo(nameof(serviceType))] Type implementationType)
+                                  {
+                                      Register(serviceType, implementationType);
                                   }
                               }
                               """;
@@ -951,6 +1132,30 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
             diagnostic.GetMessage());
     }
 
+    [Fact]
+    public async Task ReportsDiagnostic_When_AssignableToConstraintReferencesUnknownMethodParameter()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IRegistry
+                              {
+                                  void Register(
+                                      Type serviceType,
+                                      [MustBeAssignableTo("missingServiceType")] Type implementationType);
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AdvancedGenericTypeConstraintAnalyzer.InvalidAssignableToConstraintConfigurationDiagnosticId, diagnostic.Id);
+        Assert.Equal(
+            "Parameter 'implementationType' references invalid related parameter 'missingServiceType'",
+            diagnostic.GetMessage());
+    }
+
     private static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
         string source,
         params MetadataReference[] additionalReferences)
@@ -993,7 +1198,7 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
         return frameworkReferences
             .Append(MetadataReference.CreateFromFile(typeof(MustImplementOpenGenericAttribute).Assembly.Location))
             .DistinctBy(static reference => reference.Display, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+            .ToArray<MetadataReference>();
     }
 
     private static MetadataReference CreateAssemblyReference(string assemblyName, string source)

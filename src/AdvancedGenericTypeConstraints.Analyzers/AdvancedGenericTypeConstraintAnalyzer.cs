@@ -53,6 +53,21 @@ public sealed class AdvancedGenericTypeConstraintAnalyzer : DiagnosticAnalyzer
     /// </summary>
     public const string MustBeOpenGenericTypeDiagnosticId = "AGTC008";
 
+    /// <summary>
+    /// Diagnostic emitted when a <see cref="Type"/> argument is not a reference type.
+    /// </summary>
+    public const string MustBeReferenceTypeDiagnosticId = "AGTC009";
+
+    /// <summary>
+    /// Diagnostic emitted when a <see cref="Type"/> argument is not assignable to another related type.
+    /// </summary>
+    public const string MustBeAssignableToDiagnosticId = "AGTC010";
+
+    /// <summary>
+    /// Diagnostic emitted when a MustBeAssignableTo constraint references an invalid related parameter.
+    /// </summary>
+    public const string InvalidAssignableToConstraintConfigurationDiagnosticId = "AGTC011";
+
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ConstraintDiagnostics.All;
 
