@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
@@ -16,7 +17,8 @@ internal static class InvocationParameterConstraintValidator
 
         var argumentsByParameter = invocation.Arguments
             .Where(static argument => argument.Parameter is not null)
-            .ToDictionary(static argument => argument.Parameter!, static argument => argument, SymbolEqualityComparer.Default);
+            .ToDictionary(static argument => argument.Parameter!, static argument => argument,
+                SymbolEqualityComparer.Default);
 
         foreach (var parameter in invocation.TargetMethod.Parameters)
         {
@@ -24,9 +26,6 @@ internal static class InvocationParameterConstraintValidator
                 continue;
 
             var typeArgument = TryGetRepresentedType(argument.Value);
-            if (typeArgument is null)
-                continue;
-
             ValidateMustBeOpenGenericType(parameter, typeArgument, argument, reportDiagnostic, symbols);
 
             foreach (var assemblyConstraint in ConstraintReaders.GetAssemblyNameConstraints(
@@ -39,11 +38,17 @@ internal static class InvocationParameterConstraintValidator
                     continue;
 
                 var otherTypeArgument = TryGetRepresentedType(otherArgument.Value);
-                if (otherTypeArgument is null || SymbolMatchHelpers.IsWhitelistedType(typeArgument, assemblyConstraint.AllowedTypes))
+                if (typeArgument is not null &&
+                    SymbolMatchHelpers.IsWhitelistedType(typeArgument, assemblyConstraint.AllowedTypes))
+                    continue;
+
+                if (typeArgument is null || otherTypeArgument is null ||
+                    HasEquivalentOrStrongerAssemblyConstraint(argument, otherArgument, assemblyConstraint, symbols))
                     continue;
 
                 var expectedAssemblyName = assemblyConstraint.Prefix +
-                                           SymbolMatchHelpers.GetAssemblySimpleName(otherTypeArgument.ContainingAssembly) +
+                                           SymbolMatchHelpers.GetAssemblySimpleName(
+                                               otherTypeArgument.ContainingAssembly) +
                                            assemblyConstraint.Suffix;
                 var actualAssemblyName = SymbolMatchHelpers.GetAssemblySimpleName(typeArgument.ContainingAssembly);
 
@@ -67,7 +72,7 @@ internal static class InvocationParameterConstraintValidator
 
     private static void ValidateMustBeOpenGenericType(
         IParameterSymbol parameter,
-        ITypeSymbol typeArgument,
+        ITypeSymbol? typeArgument,
         IArgumentOperation argument,
         Action<Diagnostic> reportDiagnostic,
         ConstraintAttributeSymbols symbols)
@@ -76,16 +81,22 @@ internal static class InvocationParameterConstraintValidator
             return;
 
         if (!parameter.GetAttributes().Any(attribute =>
-                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, symbols.MustBeOpenGenericTypeAttribute)))
+                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass,
+                    symbols.MustBeOpenGenericTypeAttribute)))
             return;
 
-        if (SymbolMatchHelpers.IsOpenGenericTypeDefinition(typeArgument))
+        if (typeArgument is not null && SymbolMatchHelpers.IsOpenGenericTypeDefinition(typeArgument))
+            return;
+
+        if (IsForwardedOpenGenericTypeConstraint(argument.Value, symbols))
             return;
 
         reportDiagnostic(Diagnostic.Create(
             ConstraintDiagnostics.MustBeOpenGenericTypeRule,
             argument.Syntax.GetLocation(),
-            SymbolMatchHelpers.ToMinimalDisplayString(typeArgument)));
+            typeArgument is null
+                ? parameter.Name
+                : SymbolMatchHelpers.ToMinimalDisplayString(typeArgument)));
     }
 
     private static ITypeSymbol? TryGetRepresentedType(IOperation operation)
@@ -96,6 +107,69 @@ internal static class InvocationParameterConstraintValidator
         return operation switch
         {
             ITypeOfOperation typeOfOperation => typeOfOperation.TypeOperand,
+            _ => null
+        };
+    }
+
+    private static bool IsForwardedOpenGenericTypeConstraint(
+        IOperation operation,
+        ConstraintAttributeSymbols symbols)
+    {
+        if (symbols.MustBeOpenGenericTypeAttribute is null)
+            return false;
+
+        var forwardedParameter = TryGetForwardedParameter(operation);
+        return forwardedParameter is not null &&
+               forwardedParameter.GetAttributes().Any(attribute =>
+                   SymbolEqualityComparer.Default.Equals(attribute.AttributeClass,
+                       symbols.MustBeOpenGenericTypeAttribute));
+    }
+
+    private static bool HasEquivalentOrStrongerAssemblyConstraint(
+        IArgumentOperation argument,
+        IArgumentOperation otherArgument,
+        AssemblyNameConstraint requiredConstraint,
+        ConstraintAttributeSymbols symbols)
+    {
+        if (symbols.MustMatchAssemblyNameOfAttribute is null)
+            return false;
+
+        var forwardedParameter = TryGetForwardedParameter(argument.Value);
+        var forwardedOtherParameter = TryGetForwardedParameter(otherArgument.Value);
+        if (forwardedParameter is null || forwardedOtherParameter is null)
+            return false;
+
+        foreach (var candidate in ConstraintReaders.GetAssemblyNameConstraints(
+                     forwardedParameter,
+                     symbols.MustMatchAssemblyNameOfAttribute))
+        {
+            if (!string.Equals(candidate.Prefix, requiredConstraint.Prefix, StringComparison.Ordinal) ||
+                !string.Equals(candidate.Suffix, requiredConstraint.Suffix, StringComparison.Ordinal) ||
+                !IsAllowedTypeSubset(candidate.AllowedTypes, requiredConstraint.AllowedTypes))
+                continue;
+
+            if (string.Equals(candidate.OtherTypeParameterName, forwardedOtherParameter.Name, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsAllowedTypeSubset(
+        ImmutableArray<INamedTypeSymbol> candidateAllowedTypes,
+        ImmutableArray<INamedTypeSymbol> requiredAllowedTypes) =>
+        Enumerable.All(candidateAllowedTypes,
+            candidateAllowedType => requiredAllowedTypes.Any(requiredAllowedType =>
+                SymbolEqualityComparer.Default.Equals(candidateAllowedType, requiredAllowedType)));
+
+    private static IParameterSymbol? TryGetForwardedParameter(IOperation operation)
+    {
+        while (operation is IConversionOperation { IsImplicit: true } conversion)
+            operation = conversion.Operand;
+
+        return operation switch
+        {
+            IParameterReferenceOperation parameterReference => parameterReference.Parameter,
             _ => null
         };
     }

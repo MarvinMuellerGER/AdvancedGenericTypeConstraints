@@ -651,6 +651,36 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
     }
 
     [Fact]
+    public async Task ReportsNoDiagnostic_When_OpenGenericTypeConstraintIsForwardedThroughTypeParameter()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IFeatureRegistry
+                              {
+                                  void Register([MustBeOpenGenericType] Type serviceType);
+                              }
+
+                              public sealed class FeatureRegistry : IFeatureRegistry
+                              {
+                                  public void Register([MustBeOpenGenericType] Type serviceType)
+                                  {
+                                  }
+
+                                  public void Forward([MustBeOpenGenericType] Type serviceType)
+                                  {
+                                      Register(serviceType);
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
     public async Task ReportsNoDiagnostic_When_TypeParameterAssemblyConstraintIsSatisfiedViaGenericForwarding()
     {
         const string source = """
@@ -686,6 +716,35 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
                                       Type implementationType)
                                   {
                                       return this;
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsNoDiagnostic_When_TypeParameterAssemblyConstraintIsForwardedThroughTypeParameters()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public sealed class FeatureRegistry
+                              {
+                                  public void RegisterInProcessApi(
+                                      [MustMatchAssemblyNameOf(nameof(implementationType), suffix: ".Contracts")] Type serviceType,
+                                      Type implementationType)
+                                  {
+                                  }
+
+                                  public void Forward(
+                                      [MustMatchAssemblyNameOf(nameof(implementationType), suffix: ".Contracts")] Type serviceType,
+                                      Type implementationType)
+                                  {
+                                      RegisterInProcessApi(serviceType, implementationType);
                                   }
                               }
                               """;
