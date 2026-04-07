@@ -10,15 +10,15 @@
         <NoWarn>$(NoWarn);RS2007</NoWarn>
         <IsPackable>true</IsPackable>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-        <PackageId>OpenGenericConstraints.Analyzers</PackageId>
-        <Description>Roslyn analyzers that validate open generic constraints declared with OpenGenericConstraints attributes.</Description>
-        <PackageTags>roslyn;analyzer;generics;constraints;csharp</PackageTags>
+        <PackageId>AdvancedGenericTypeConstraints.Analyzers</PackageId>
+        <Description>Roslyn analyzers that validate generic type checks declared with AdvancedGenericTypeConstraints attributes.</Description>
+        <PackageTags>roslyn;analyzer;generics;constraints;csharp;attributes</PackageTags>
         <DevelopmentDependency>true</DevelopmentDependency>
         <NoPackageAnalysis>true</NoPackageAnalysis>
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\OpenGenericConstraints.Abstractions\OpenGenericConstraints.Abstractions.csproj" PrivateAssets="all"/>
+        <ProjectReference Include="..\AdvancedGenericTypeConstraints.Abstractions\AdvancedGenericTypeConstraints.Abstractions.csproj" PrivateAssets="all"/>
     </ItemGroup>
 
     <ItemGroup>

@@ -1,17 +1,20 @@
-# OpenGenericConstraints
+# AdvancedGenericTypeConstraints
 
-OpenGenericConstraints enables compile-time-like validation for open generic constraints in C# by combining lightweight
+AdvancedGenericTypeConstraints enables compile-time-like validation for generic type rules in C# by combining lightweight
 attributes with a Roslyn analyzer.
 
 ## Why this exists
 
-C# generic constraints cannot express rules like "the supplied type must implement `IHandleMessages<T>` for some `T`"
-when the constraint targets an open generic type definition.
+Native C# generic constraints cannot express rules like:
+
+- the supplied type must implement `IHandleMessages<T>` for some `T`
+- the supplied type must carry a specific attribute
+- one generic type argument must come from an assembly whose name is derived from another type argument's assembly
 
 This project closes that gap with:
 
-- a small abstractions package that exposes constraint attributes
-- a Roslyn analyzer package that validates the supplied type arguments at compile time
+- a small abstractions package that exposes declarative attributes
+- a Roslyn analyzer package that validates supplied type arguments at compile time
 
 ## Packages
 
@@ -19,38 +22,60 @@ Install both packages in the consuming project:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="OpenGenericConstraints.Abstractions" Version="0.1.0" />
-  <PackageReference Include="OpenGenericConstraints.Analyzers" Version="0.1.0" PrivateAssets="all" />
+  <PackageReference Include="AdvancedGenericTypeConstraints.Abstractions" Version="0.2.0" />
+  <PackageReference Include="AdvancedGenericTypeConstraints.Analyzers" Version="0.2.0" PrivateAssets="all" />
 </ItemGroup>
 ```
 
 ## Example
 
 ```csharp
-using OpenGenericConstraints;
+using AdvancedGenericTypeConstraints;
+
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class ServiceAttribute : Attribute;
 
 public interface IHandleMessages<TMessage>;
 
 public interface IFeatureRegistry
 {
     void RegisterMessageHandler<
-        [MustImplementOpenGeneric(typeof(IHandleMessages<>))] TMessageHandler>();
+        [MustImplementOpenGeneric(typeof(IHandleMessages<>))]
+        [MustHaveAttribute(typeof(ServiceAttribute))]
+        TMessageHandler>();
+
+    void RegisterServiceContract<
+        [MustMatchAssemblyNameOf(nameof(TImplementation), suffix: ".Contracts")]
+        TService,
+        TImplementation>();
 }
-
-public sealed class MyMessage;
-
-public sealed class MyHandler : IHandleMessages<MyMessage>;
 ```
 
-Using `RegisterMessageHandler<MyHandler>()` is valid.
+## Available checks
 
-Using a type that does not match the configured open generic definition produces:
+The current API supports:
 
-```text
-OGC001: Type 'MyHandler' must implement 'IHandleMessages<>'
-```
+- `MustImplementOpenGenericAttribute`
+- `MustImplementOpenGenericAttribute(Type openGenericType, bool exactlyOne)`
+- `MustNotImplementOpenGenericAttribute`
+- `MustHaveAttributeAttribute`
+- `MustMatchAssemblyNameOfAttribute`
+
+## Diagnostic IDs
+
+The analyzer currently emits these diagnostics:
+
+- `AGTC001`: required open generic type is missing
+- `AGTC002`: forbidden open generic type is present
+- `AGTC003`: required open generic type is not matched exactly once
+- `AGTC004`: invalid `MustImplementOpenGeneric` configuration on a generic parameter
+- `AGTC005`: required attribute is missing
+- `AGTC006`: assembly naming rule between two type arguments is violated
+- `AGTC007`: `MustMatchAssemblyNameOf` references an invalid generic parameter
 
 ## Matching semantics
+
+### Open generic checks
 
 The analyzer compares open generic type definitions, not closed constructed types.
 
@@ -60,30 +85,46 @@ A type counts as a match when the configured open generic type definition appear
 - any base type in its inheritance chain
 - any implemented interface
 
-This means matching is not limited to interfaces. Open generic classes, interfaces, and other generic type definitions
-are all supported as long as the open generic definition matches.
+### Attribute checks
 
-## Current API
+`MustHaveAttributeAttribute` checks whether the supplied type argument is directly annotated with the configured
+attribute type. Derived attributes also satisfy the rule.
 
-The project currently supports:
+### Assembly naming checks
 
-- `MustImplementOpenGenericAttribute`
-- `MustImplementOpenGenericAttribute(Type openGenericType, bool exactlyOne)`
-- `MustNotImplementOpenGenericAttribute`
+`MustMatchAssemblyNameOfAttribute` compares simple assembly names.
+
+For a declaration like:
+
+```csharp
+void RegisterServiceContract<
+    [MustMatchAssemblyNameOf(nameof(TImplementation), suffix: ".Contracts")]
+    TService,
+    TImplementation>();
+```
+
+the analyzer requires `TService` to come from an assembly named:
+
+```text
+{AssemblyOf(TImplementation)} + ".Contracts"
+```
+
+You can also configure:
+
+- `prefix`
+- `suffix`
+- `AllowedTypes` as an explicit whitelist for legacy exceptions
 
 Example:
 
 ```csharp
-public interface IFeatureRegistry
-{
-    void RegisterSingle<
-        [MustImplementOpenGeneric(typeof(IHandleMessages<>), true)]
-        THandler>();
-
-    void RegisterWithoutSagaStarter<
-        [MustNotImplementOpenGeneric(typeof(IAmStartedByMessages<>))]
-        THandler>();
-}
+void RegisterServiceContract<
+    [MustMatchAssemblyNameOf(
+        nameof(TImplementation),
+        suffix: ".Contracts",
+        AllowedTypes = new Type[] { typeof(ICelestialPostService), typeof(IOrbitalEchoStore) })]
+    TService,
+    TImplementation>();
 ```
 
 ## Non-goals

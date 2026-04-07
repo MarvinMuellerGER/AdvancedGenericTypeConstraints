@@ -1,4 +1,4 @@
-namespace OpenGenericConstraints;
+namespace AdvancedGenericTypeConstraints;
 
 /// <summary>
 /// Requires a generic type argument to match a given open generic type definition.

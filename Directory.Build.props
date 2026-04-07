@@ -2,8 +2,8 @@
   <PropertyGroup>
     <Authors>Marvin Mueller</Authors>
     <Company>Marvin Mueller</Company>
-    <RepositoryUrl>https://github.com/MarvinMuellerGER/OpenGenericConstraints</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/MarvinMuellerGER/OpenGenericConstraints</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/MarvinMuellerGER/AdvancedGenericTypeConstraints</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/MarvinMuellerGER/AdvancedGenericTypeConstraints</PackageProjectUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

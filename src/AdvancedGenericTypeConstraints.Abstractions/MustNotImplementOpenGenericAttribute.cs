@@ -1,4 +1,4 @@
-namespace OpenGenericConstraints;
+namespace AdvancedGenericTypeConstraints;
 
 /// <summary>
 /// Forbids a generic type argument from matching a given open generic type definition.

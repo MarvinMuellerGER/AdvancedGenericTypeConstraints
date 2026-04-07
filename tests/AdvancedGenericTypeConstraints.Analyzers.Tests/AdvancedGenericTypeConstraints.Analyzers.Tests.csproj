@@ -27,8 +27,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\OpenGenericConstraints.Abstractions\OpenGenericConstraints.Abstractions.csproj"/>
-        <ProjectReference Include="..\..\src\OpenGenericConstraints.Analyzers\OpenGenericConstraints.Analyzers.csproj"/>
+        <ProjectReference Include="..\..\src\AdvancedGenericTypeConstraints.Abstractions\AdvancedGenericTypeConstraints.Abstractions.csproj"/>
+        <ProjectReference Include="..\..\src\AdvancedGenericTypeConstraints.Analyzers\AdvancedGenericTypeConstraints.Analyzers.csproj"/>
     </ItemGroup>
 
 </Project>

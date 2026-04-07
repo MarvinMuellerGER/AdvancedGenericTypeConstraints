@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>AdvancedGenericTypeConstraints</RootNamespace>
+        <IsPackable>true</IsPackable>
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <PackageId>AdvancedGenericTypeConstraints.Abstractions</PackageId>
+        <Description>Attributes for expressing generic type checks that are enforced by the AdvancedGenericTypeConstraints Roslyn analyzer.</Description>
+        <PackageTags>roslyn;analyzer;generics;constraints;csharp;attributes</PackageTags>
+    </PropertyGroup>
+
+</Project>

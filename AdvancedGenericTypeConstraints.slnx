@@ -1,0 +1,9 @@
+<Solution>
+    <Folder Name="/src/">
+        <Project Path="src/AdvancedGenericTypeConstraints.Abstractions/AdvancedGenericTypeConstraints.Abstractions.csproj"/>
+        <Project Path="src/AdvancedGenericTypeConstraints.Analyzers/AdvancedGenericTypeConstraints.Analyzers.csproj"/>
+    </Folder>
+    <Folder Name="/tests/">
+        <Project Path="tests/AdvancedGenericTypeConstraints.Analyzers.Tests/AdvancedGenericTypeConstraints.Analyzers.Tests.csproj"/>
+    </Folder>
+</Solution>

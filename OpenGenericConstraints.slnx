@@ -1,9 +1,0 @@
-<Solution>
-    <Folder Name="/src/">
-        <Project Path="src/OpenGenericConstraints.Abstractions/OpenGenericConstraints.Abstractions.csproj"/>
-        <Project Path="src/OpenGenericConstraints.Analyzers/OpenGenericConstraints.Analyzers.csproj"/>
-    </Folder>
-    <Folder Name="/tests/">
-        <Project Path="tests/OpenGenericConstraints.Analyzers.Tests/OpenGenericConstraints.Analyzers.Tests.csproj"/>
-    </Folder>
-</Solution>
