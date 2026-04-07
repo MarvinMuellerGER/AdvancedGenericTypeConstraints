@@ -1,15 +1,15 @@
 namespace AdvancedGenericTypeConstraints;
 
 /// <summary>
-/// Requires a generic type argument to be declared in an assembly whose simple name matches another type argument's
-/// assembly simple name with an optional prefix and suffix.
+/// Requires a generic type argument or <see cref="Type"/> parameter value to be declared in an assembly whose simple
+/// name matches another related type's assembly simple name with an optional prefix and suffix.
 /// </summary>
 /// <param name="otherTypeParameterName">
-/// The name of the related generic type parameter whose assembly name is used as the base value.
+/// The name of the related generic type parameter or method parameter whose assembly name is used as the base value.
 /// </param>
 /// <param name="prefix">An optional prefix added before the related assembly name.</param>
 /// <param name="suffix">An optional suffix added after the related assembly name.</param>
-[AttributeUsage(AttributeTargets.GenericParameter, AllowMultiple = true)]
+[AttributeUsage(AttributeTargets.GenericParameter | AttributeTargets.Parameter, AllowMultiple = true)]
 public sealed class MustMatchAssemblyNameOfAttribute(
     string otherTypeParameterName,
     string prefix = "",

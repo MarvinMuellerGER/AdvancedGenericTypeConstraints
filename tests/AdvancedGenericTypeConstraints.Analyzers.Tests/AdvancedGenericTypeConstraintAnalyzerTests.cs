@@ -483,6 +483,125 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
     }
 
     [Fact]
+    public async Task ReportsNoDiagnostic_When_TypeParameterAssemblyNamesMatch()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IRegistry
+                              {
+                                  void RegisterInProcessApi(
+                                      [MustMatchAssemblyNameOf(nameof(implementationType), suffix: ".Contracts")] Type serviceType,
+                                      Type implementationType);
+                              }
+
+                              public static class Demo
+                              {
+                                  public static void Run(IRegistry registry)
+                                  {
+                                      registry.RegisterInProcessApi(typeof(Feature.Contracts.IService), typeof(Feature.ServiceImplementation));
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(
+            source,
+            CreateAssemblyReference(
+                "Feature.Contracts",
+                "namespace Feature.Contracts { public interface IService { } }"),
+            CreateAssemblyReference(
+                "Feature",
+                "namespace Feature { public sealed class ServiceImplementation { } }"));
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsDiagnostic_When_TypeParameterAssemblyNamesDoNotMatch()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IRegistry
+                              {
+                                  void RegisterInProcessApi(
+                                      [MustMatchAssemblyNameOf(nameof(implementationType), suffix: ".Contracts")] Type serviceType,
+                                      Type implementationType);
+                              }
+
+                              public static class Demo
+                              {
+                                  public static void Run(IRegistry registry)
+                                  {
+                                      registry.RegisterInProcessApi(typeof(Legacy.Contracts.IService), typeof(Feature.ServiceImplementation));
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(
+            source,
+            CreateAssemblyReference(
+                "Legacy.Contracts",
+                "namespace Legacy.Contracts { public interface IService { } }"),
+            CreateAssemblyReference(
+                "Feature",
+                "namespace Feature { public sealed class ServiceImplementation { } }"));
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AdvancedGenericTypeConstraintAnalyzer.MustMatchAssemblyNameDiagnosticId, diagnostic.Id);
+        Assert.Equal(
+            "Type 'IService' must be declared in assembly 'Feature.Contracts' to match type 'ServiceImplementation'",
+            diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task ReportsNoDiagnostic_When_TypeParameterAssemblyConstraintIsSatisfiedViaGenericForwarding()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IFeatureRegistry
+                              {
+                                  IFeatureRegistry RegisterInProcessApi<
+                                      [MustMatchAssemblyNameOf(nameof(TImplementation), suffix: ".Contracts")] TService,
+                                      TImplementation>()
+                                      where TService : class
+                                      where TImplementation : class, TService;
+
+                                  IFeatureRegistry RegisterInProcessApi(
+                                      [MustMatchAssemblyNameOf(nameof(implementationType), suffix: ".Contracts")] Type serviceType,
+                                      Type implementationType);
+                              }
+
+                              public sealed class ConfiguredFeatureRegistry : IFeatureRegistry
+                              {
+                                  public IFeatureRegistry RegisterInProcessApi<
+                                      [MustMatchAssemblyNameOf(nameof(TImplementation), suffix: ".Contracts")] TService,
+                                      TImplementation>()
+                                      where TService : class
+                                      where TImplementation : class, TService
+                                  {
+                                      return RegisterInProcessApi(typeof(TService), typeof(TImplementation));
+                                  }
+
+                                  public IFeatureRegistry RegisterInProcessApi(
+                                      [MustMatchAssemblyNameOf(nameof(implementationType), suffix: ".Contracts")] Type serviceType,
+                                      Type implementationType)
+                                  {
+                                      return this;
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
     public async Task ReportsDiagnostic_When_AssemblyNameDoesNotMatchConfiguredSuffix()
     {
         const string source = """
@@ -574,7 +693,31 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
         var diagnostic = Assert.Single(diagnostics);
         Assert.Equal(AdvancedGenericTypeConstraintAnalyzer.InvalidAssemblyConstraintConfigurationDiagnosticId, diagnostic.Id);
         Assert.Equal(
-            "Generic parameter 'TService' references invalid related parameter 'TMissing'",
+            "Parameter or generic parameter 'TService' references invalid related parameter 'TMissing'",
+            diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task ReportsDiagnostic_When_AssemblyConstraintReferencesUnknownMethodParameter()
+    {
+        const string source = """
+                              using System;
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IRegistry
+                              {
+                                  void Register(
+                                      [MustMatchAssemblyNameOf("missingImplementationType", suffix: ".Contracts")] Type serviceType,
+                                      Type implementationType);
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AdvancedGenericTypeConstraintAnalyzer.InvalidAssemblyConstraintConfigurationDiagnosticId, diagnostic.Id);
+        Assert.Equal(
+            "Parameter or generic parameter 'serviceType' references invalid related parameter 'missingImplementationType'",
             diagnostic.GetMessage());
     }
 

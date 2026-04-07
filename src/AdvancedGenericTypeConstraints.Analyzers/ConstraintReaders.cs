@@ -72,12 +72,22 @@ internal static class ConstraintReaders
     public static ImmutableArray<AssemblyNameConstraint> GetAssemblyNameConstraints(
         ITypeParameterSymbol typeParameter,
         INamedTypeSymbol? attributeSymbol)
+        => GetAssemblyNameConstraints(typeParameter.GetAttributes(), attributeSymbol);
+
+    public static ImmutableArray<AssemblyNameConstraint> GetAssemblyNameConstraints(
+        IParameterSymbol parameter,
+        INamedTypeSymbol? attributeSymbol)
+        => GetAssemblyNameConstraints(parameter.GetAttributes(), attributeSymbol);
+
+    private static ImmutableArray<AssemblyNameConstraint> GetAssemblyNameConstraints(
+        ImmutableArray<AttributeData> attributes,
+        INamedTypeSymbol? attributeSymbol)
     {
         if (attributeSymbol is null)
             return [];
 
         var builder = ImmutableArray.CreateBuilder<AssemblyNameConstraint>();
-        var relevantAttributes = typeParameter.GetAttributes().Where(attribute =>
+        var relevantAttributes = attributes.Where(attribute =>
             SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeSymbol) &&
             attribute.ConstructorArguments.Length is >= 1 and <= 3 &&
             attribute.ConstructorArguments[0].Value is string);

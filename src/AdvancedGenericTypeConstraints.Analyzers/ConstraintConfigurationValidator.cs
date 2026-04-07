@@ -6,6 +6,22 @@ namespace AdvancedGenericTypeConstraints.Analyzers;
 internal static class ConstraintConfigurationValidator
 {
     public static void Validate(
+        IMethodSymbol method,
+        ConstraintAttributeSymbols symbols,
+        Action<Diagnostic> reportDiagnostic)
+    {
+        Validate(method.TypeParameters, symbols, reportDiagnostic);
+
+        if (symbols.MustMatchAssemblyNameOfAttribute is null)
+            return;
+
+        ValidateAssemblyConstraintConfiguration(
+            method.Parameters,
+            symbols.MustMatchAssemblyNameOfAttribute,
+            reportDiagnostic);
+    }
+
+    public static void Validate(
         ImmutableArray<ITypeParameterSymbol> typeParameters,
         ConstraintAttributeSymbols symbols,
         Action<Diagnostic> reportDiagnostic)
@@ -24,6 +40,40 @@ internal static class ConstraintConfigurationValidator
         }
     }
 
+    private static void ValidateAssemblyConstraintConfiguration(
+        ImmutableArray<IParameterSymbol> parameters,
+        INamedTypeSymbol attributeSymbol,
+        Action<Diagnostic> reportDiagnostic)
+    {
+        var availableNames = new HashSet<string>(
+            parameters.Select(static parameter => parameter.Name),
+            StringComparer.Ordinal);
+
+        foreach (var parameter in parameters)
+        foreach (var attribute in parameter.GetAttributes().Where(attribute =>
+                     SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeSymbol) &&
+                     attribute.ConstructorArguments.Length is >= 1 and <= 3 &&
+                     attribute.ConstructorArguments[0].Value is string))
+        {
+            var otherParameterName = (string)attribute.ConstructorArguments[0].Value!;
+            var isInvalidReference = string.Equals(otherParameterName, parameter.Name, StringComparison.Ordinal) ||
+                                     !availableNames.Contains(otherParameterName);
+            var isInvalidTypeUsage = !IsSystemType(parameter.Type) ||
+                                     !parameters.Any(candidate =>
+                                         string.Equals(candidate.Name, otherParameterName, StringComparison.Ordinal) &&
+                                         IsSystemType(candidate.Type));
+
+            if (!isInvalidReference && !isInvalidTypeUsage)
+                continue;
+
+            reportDiagnostic(Diagnostic.Create(
+                ConstraintDiagnostics.InvalidAssemblyConstraintConfigurationRule,
+                GetAttributeLocation(attribute, parameter),
+                parameter.Name,
+                otherParameterName));
+        }
+    }
+
     private static void ValidateMustImplementConstraintConfiguration(
         ITypeParameterSymbol typeParameter,
         INamedTypeSymbol attributeSymbol,
@@ -33,8 +83,7 @@ internal static class ConstraintConfigurationValidator
             .Where(attribute =>
                 SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeSymbol) &&
                 attribute.ConstructorArguments.Length is 1 or 2 &&
-                attribute.ConstructorArguments[0].Value is INamedTypeSymbol openGenericType &&
-                openGenericType.TypeKind is not TypeKind.Interface)
+                attribute.ConstructorArguments[0].Value is INamedTypeSymbol { TypeKind: not TypeKind.Interface })
             .ToArray();
 
         if (nonInterfaceAttributes.Length <= 1)
@@ -77,8 +126,12 @@ internal static class ConstraintConfigurationValidator
         }
     }
 
-    private static Location GetAttributeLocation(AttributeData attribute, ITypeParameterSymbol typeParameter) =>
+    private static bool IsSystemType(ITypeSymbol type) =>
+        type is INamedTypeSymbol namedType &&
+        string.Equals(namedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), "global::System.Type", StringComparison.Ordinal);
+
+    private static Location GetAttributeLocation(AttributeData attribute, ISymbol symbol) =>
         attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
-        ?? typeParameter.Locations.FirstOrDefault()
+        ?? symbol.Locations.FirstOrDefault()
         ?? Location.None;
 }

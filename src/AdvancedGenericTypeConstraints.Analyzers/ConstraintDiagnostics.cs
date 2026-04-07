@@ -61,12 +61,12 @@ internal static class ConstraintDiagnostics
 
     public static readonly DiagnosticDescriptor InvalidAssemblyConstraintConfigurationRule = new(
         AdvancedGenericTypeConstraintAnalyzer.InvalidAssemblyConstraintConfigurationDiagnosticId,
-        "The assembly naming constraint references an invalid generic parameter",
-        "Generic parameter '{0}' references invalid related parameter '{1}'",
+        "The assembly naming constraint references an invalid related parameter",
+        "Parameter or generic parameter '{0}' references invalid related parameter '{1}'",
         "Usage",
         DiagnosticSeverity.Error,
         true,
-        "A MustMatchAssemblyNameOf constraint must reference another generic parameter declared on the same type or method.");
+        "A MustMatchAssemblyNameOf constraint must reference another generic parameter or method parameter declared on the same method, or another generic parameter declared on the same type.");
 
     public static ImmutableArray<DiagnosticDescriptor> All =>
     [

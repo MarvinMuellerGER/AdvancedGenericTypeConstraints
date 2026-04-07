@@ -2,8 +2,8 @@
 
 This sample shows how a consuming project references the published NuGet packages:
 
-- `AdvancedGenericTypeConstraints.Abstractions` `0.2.0`
-- `AdvancedGenericTypeConstraints.Analyzers` `0.2.0`
+- `AdvancedGenericTypeConstraints.Abstractions` `0.2.1`
+- `AdvancedGenericTypeConstraints.Analyzers` `0.2.1`
 
 The sample intentionally triggers each analyzer rule exactly once during build:
 
@@ -13,4 +13,4 @@ The sample intentionally triggers each analyzer rule exactly once during build:
 - `AGTC004` invalid `MustImplementOpenGeneric` configuration
 - `AGTC005` missing required attribute
 - `AGTC006` assembly naming rule violation
-- `AGTC007` invalid `MustMatchAssemblyNameOf` reference
+- `AGTC007` invalid `MustMatchAssemblyNameOf` related-parameter reference

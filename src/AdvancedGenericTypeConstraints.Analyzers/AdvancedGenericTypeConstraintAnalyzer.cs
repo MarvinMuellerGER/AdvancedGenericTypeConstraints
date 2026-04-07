@@ -84,7 +84,7 @@ public sealed class AdvancedGenericTypeConstraintAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeMethod(SymbolAnalysisContext context, ConstraintAttributeSymbols symbols)
     {
         var method = (IMethodSymbol)context.Symbol;
-        ConstraintConfigurationValidator.Validate(method.TypeParameters, symbols, context.ReportDiagnostic);
+        ConstraintConfigurationValidator.Validate(method, symbols, context.ReportDiagnostic);
     }
 
     private static void AnalyzeNamedType(SymbolAnalysisContext context, ConstraintAttributeSymbols symbols)
@@ -100,6 +100,11 @@ public sealed class AdvancedGenericTypeConstraintAnalyzer : DiagnosticAnalyzer
             invocation.TargetMethod.TypeParameters,
             invocation.TargetMethod.TypeArguments,
             invocation.Syntax.GetLocation(),
+            context.ReportDiagnostic,
+            symbols);
+
+        InvocationParameterConstraintValidator.Validate(
+            invocation,
             context.ReportDiagnostic,
             symbols);
     }

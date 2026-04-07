@@ -200,7 +200,7 @@ internal static class TypeArgumentConstraintValidator
             .Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, requiredAttribute));
     }
 
-    private static bool HasEquivalentOrStrongerAssemblyConstraint(
+    internal static bool HasEquivalentOrStrongerAssemblyConstraint(
         ITypeSymbol typeArgument,
         ITypeSymbol otherTypeArgument,
         AssemblyNameConstraint requiredConstraint,

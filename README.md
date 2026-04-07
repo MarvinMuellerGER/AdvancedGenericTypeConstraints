@@ -70,8 +70,8 @@ The analyzer currently emits these diagnostics:
 - `AGTC003`: required open generic type is not matched exactly once
 - `AGTC004`: invalid `MustImplementOpenGeneric` configuration on a generic parameter
 - `AGTC005`: required attribute is missing
-- `AGTC006`: assembly naming rule between two type arguments is violated
-- `AGTC007`: `MustMatchAssemblyNameOf` references an invalid generic parameter
+- `AGTC006`: assembly naming rule between two related types is violated
+- `AGTC007`: `MustMatchAssemblyNameOf` references an invalid related parameter
 
 ## Matching semantics
 
@@ -103,6 +103,11 @@ Forwarded generic type parameters are also accepted when they already declare th
 
 `MustMatchAssemblyNameOfAttribute` compares simple assembly names.
 
+You can apply it to:
+
+- a generic type parameter
+- a method parameter of type `System.Type`
+
 For a declaration like:
 
 ```csharp
@@ -118,6 +123,19 @@ the analyzer requires `TService` to come from an assembly named:
 {AssemblyOf(TImplementation)} + ".Contracts"
 ```
 
+The same rule also works for `Type`-based overloads when the call site passes statically analyzable values such as
+`typeof(SomeType)`:
+
+```csharp
+void RegisterInProcessApi(
+    [MustMatchAssemblyNameOf(nameof(implementationType), suffix: ".Contracts")] Type serviceType,
+    Type implementationType);
+```
+
+```csharp
+registry.RegisterInProcessApi(typeof(Feature.Contracts.IService), typeof(Feature.ServiceImplementation));
+```
+
 You can also configure:
 
 - `prefix`
@@ -127,6 +145,9 @@ You can also configure:
 Forwarded generic type parameters are also accepted when they already declare an equivalent or stricter
 `MustMatchAssemblyNameOfAttribute` constraint. This allows delegating overloads and explicit interface
 implementations to pass constrained generic parameters through without needing `#pragma warning disable AGTC006`.
+
+The same applies when a generic overload forwards into a `Type`-based overload via `typeof(TService)` and
+`typeof(TImplementation)`.
 
 Example:
 
