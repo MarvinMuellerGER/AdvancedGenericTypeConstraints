@@ -7,6 +7,7 @@ internal readonly struct ConstraintAttributeSymbols(
     INamedTypeSymbol? mustNotImplementAttribute,
     INamedTypeSymbol? mustHaveAttribute,
     INamedTypeSymbol? mustMatchAssemblyNameOfAttribute,
+    INamedTypeSymbol? mustMatchTypeNameAttribute,
     INamedTypeSymbol? mustBeOpenGenericTypeAttribute,
     INamedTypeSymbol? mustBeReferenceTypeAttribute,
     INamedTypeSymbol? mustBeAssignableToAttribute)
@@ -19,6 +20,8 @@ internal readonly struct ConstraintAttributeSymbols(
 
     public INamedTypeSymbol? MustMatchAssemblyNameOfAttribute { get; } = mustMatchAssemblyNameOfAttribute;
 
+    public INamedTypeSymbol? MustMatchTypeNameAttribute { get; } = mustMatchTypeNameAttribute;
+
     public INamedTypeSymbol? MustBeOpenGenericTypeAttribute { get; } = mustBeOpenGenericTypeAttribute;
 
     public INamedTypeSymbol? MustBeReferenceTypeAttribute { get; } = mustBeReferenceTypeAttribute;
@@ -30,6 +33,7 @@ internal readonly struct ConstraintAttributeSymbols(
         MustNotImplementAttribute is not null ||
         MustHaveAttribute is not null ||
         MustMatchAssemblyNameOfAttribute is not null ||
+        MustMatchTypeNameAttribute is not null ||
         MustBeOpenGenericTypeAttribute is not null ||
         MustBeReferenceTypeAttribute is not null ||
         MustBeAssignableToAttribute is not null;
@@ -40,6 +44,7 @@ internal readonly struct ConstraintAttributeSymbols(
             compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustNotImplementOpenGenericAttribute"),
             compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustHaveAttributeAttribute"),
             compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustMatchAssemblyNameOfAttribute"),
+            compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustMatchTypeNameAttribute"),
             compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustBeOpenGenericTypeAttribute"),
             compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustBeReferenceTypeAttribute"),
             compilation.GetTypeByMetadataName("AdvancedGenericTypeConstraints.MustBeAssignableToAttribute"));

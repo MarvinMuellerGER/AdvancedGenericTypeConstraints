@@ -29,3 +29,10 @@ internal readonly struct AssignableToConstraint(string otherParameterName)
 {
     public string OtherParameterName { get; } = otherParameterName;
 }
+
+internal readonly struct TypeNameConstraint(string prefix, string suffix)
+{
+    public string Prefix { get; } = prefix;
+
+    public string Suffix { get; } = suffix;
+}

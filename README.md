@@ -26,8 +26,8 @@ Install both packages in the consuming project:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="AdvancedGenericTypeConstraints.Abstractions" Version="0.3.0" />
-  <PackageReference Include="AdvancedGenericTypeConstraints.Analyzers" Version="0.3.0" PrivateAssets="all" />
+  <PackageReference Include="AdvancedGenericTypeConstraints.Abstractions" Version="0.4.0" />
+  <PackageReference Include="AdvancedGenericTypeConstraints.Analyzers" Version="0.4.0" PrivateAssets="all" />
 </ItemGroup>
 ```
 
@@ -64,6 +64,7 @@ The current API supports:
 - `MustNotImplementOpenGenericAttribute`
 - `MustHaveAttributeAttribute`
 - `MustMatchAssemblyNameOfAttribute`
+- `MustMatchTypeNameAttribute`
 - `MustBeOpenGenericTypeAttribute`
 - `MustBeReferenceTypeAttribute`
 - `MustBeAssignableToAttribute`
@@ -83,6 +84,8 @@ The analyzer currently emits these diagnostics:
 - `AGTC009`: a `Type` argument is not a reference type
 - `AGTC010`: a `Type` argument is not assignable to another related `Type` argument
 - `AGTC011`: `MustBeAssignableTo` references an invalid related parameter
+- `AGTC012`: a generic `Type` argument name does not match the configured prefix/suffix
+- `AGTC013`: `MustMatchTypeName` is configured without prefix and suffix
 
 ## Matching semantics
 
@@ -109,6 +112,21 @@ attribute type. Derived attributes also satisfy the rule.
 
 Forwarded generic type parameters are also accepted when they already declare the same
 `MustHaveAttributeAttribute` constraint.
+
+### Type name checks
+
+`MustMatchTypeNameAttribute` checks generic type argument names against an optional `prefix` and/or `suffix`.
+
+Example:
+
+```csharp
+void RegisterService<[MustMatchTypeName(prefix: "I", suffix: "Service")] TService>();
+```
+
+This accepts names like `IPaymentService` and rejects names like `PaymentHandler`.
+
+Forwarded generic type parameters are also accepted when they already declare an equivalent or stricter
+`MustMatchTypeNameAttribute` constraint.
 
 ### Assembly naming checks
 

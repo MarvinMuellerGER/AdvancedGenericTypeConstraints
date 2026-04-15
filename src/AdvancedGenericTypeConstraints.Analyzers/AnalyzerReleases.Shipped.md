@@ -25,3 +25,11 @@ AGTC008 | Usage | Error | Type values passed to parameters annotated with MustBe
 AGTC009 | Usage | Error | Type values passed to parameters annotated with MustBeReferenceType must represent reference types.
 AGTC010 | Usage | Error | Type values passed to parameters annotated with MustBeAssignableTo must be assignable to the related type parameter.
 AGTC011 | Usage | Error | A MustBeAssignableTo constraint must reference another System.Type method parameter on the same method.
+
+## Release 0.4.0
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+AGTC012 | Usage | Error | Type arguments for annotated generic parameters must match the configured type-name prefix and/or suffix.
+AGTC013 | Usage | Error | A MustMatchTypeName constraint must define at least one non-empty value (prefix or suffix).

@@ -25,6 +25,7 @@ internal static class TypeArgumentConstraintValidator
             ValidateMustHaveAttribute(typeParameter, typeArgument, location, reportDiagnostic, symbols);
             ValidateAssemblyName(typeParameter, typeArgument, typeArguments, typeParameterIndices, location,
                 reportDiagnostic, symbols);
+            ValidateTypeName(typeParameter, typeArgument, location, reportDiagnostic, symbols);
         }
     }
 
@@ -145,6 +146,30 @@ internal static class TypeArgumentConstraintValidator
         }
     }
 
+    private static void ValidateTypeName(
+        ITypeParameterSymbol typeParameter,
+        ITypeSymbol typeArgument,
+        Location location,
+        Action<Diagnostic> reportDiagnostic,
+        ConstraintAttributeSymbols symbols)
+    {
+        foreach (var typeNameConstraint in ConstraintReaders.GetTypeNameConstraints(
+                     typeParameter,
+                     symbols.MustMatchTypeNameAttribute))
+        {
+            if (TypeNameMatchesConstraint(typeArgument.Name, typeNameConstraint) ||
+                HasEquivalentOrStrongerTypeNameConstraint(typeArgument, typeNameConstraint, symbols))
+                continue;
+
+            reportDiagnostic(Diagnostic.Create(
+                ConstraintDiagnostics.MustMatchTypeNameRule,
+                location,
+                SymbolMatchHelpers.ToMinimalDisplayString(typeArgument),
+                typeNameConstraint.Prefix,
+                typeNameConstraint.Suffix));
+        }
+    }
+
     private static Dictionary<string, int> BuildTypeParameterIndexMap(
         ImmutableArray<ITypeParameterSymbol> typeParameters)
     {
@@ -200,6 +225,21 @@ internal static class TypeArgumentConstraintValidator
             .Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, requiredAttribute));
     }
 
+    private static bool HasEquivalentOrStrongerTypeNameConstraint(
+        ITypeSymbol typeArgument,
+        TypeNameConstraint requiredConstraint,
+        ConstraintAttributeSymbols symbols)
+    {
+        if (typeArgument is not ITypeParameterSymbol typeParameter)
+            return false;
+
+        foreach (var candidate in ConstraintReaders.GetTypeNameConstraints(typeParameter, symbols.MustMatchTypeNameAttribute))
+            if (IsEquivalentOrStrongerTypeNameConstraint(candidate, requiredConstraint))
+                return true;
+
+        return false;
+    }
+
     internal static bool HasEquivalentOrStrongerAssemblyConstraint(
         ITypeSymbol typeArgument,
         ITypeSymbol otherTypeArgument,
@@ -248,4 +288,14 @@ internal static class TypeArgumentConstraintValidator
         return typeParameters.FirstOrDefault(candidate =>
             string.Equals(candidate.Name, typeParameterName, StringComparison.Ordinal));
     }
+
+    private static bool TypeNameMatchesConstraint(string typeName, TypeNameConstraint constraint) =>
+        typeName.StartsWith(constraint.Prefix, StringComparison.Ordinal) &&
+        typeName.EndsWith(constraint.Suffix, StringComparison.Ordinal);
+
+    private static bool IsEquivalentOrStrongerTypeNameConstraint(
+        TypeNameConstraint candidate,
+        TypeNameConstraint requiredConstraint) =>
+        candidate.Prefix.StartsWith(requiredConstraint.Prefix, StringComparison.Ordinal) &&
+        candidate.Suffix.EndsWith(requiredConstraint.Suffix, StringComparison.Ordinal);
 }

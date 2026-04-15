@@ -340,6 +340,116 @@ public class AdvancedGenericTypeConstraintAnalyzerTests
     }
 
     [Fact]
+    public async Task ReportsNoDiagnostic_When_TypeNameMatchesConfiguredPrefixAndSuffix()
+    {
+        const string source = """
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IRegistry
+                              {
+                                  void Register<[MustMatchTypeName(prefix: "I", suffix: "Service")] TService>();
+                              }
+
+                              public interface IArcaneService
+                              {
+                              }
+
+                              public static class Demo
+                              {
+                                  public static void Run(IRegistry registry)
+                                  {
+                                      registry.Register<IArcaneService>();
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsDiagnostic_When_TypeNameDoesNotMatchConfiguredPrefixAndSuffix()
+    {
+        const string source = """
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IRegistry
+                              {
+                                  void Register<[MustMatchTypeName(prefix: "I", suffix: "Service")] TService>();
+                              }
+
+                              public interface ArcaneHandler
+                              {
+                              }
+
+                              public static class Demo
+                              {
+                                  public static void Run(IRegistry registry)
+                                  {
+                                      registry.Register<ArcaneHandler>();
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AdvancedGenericTypeConstraintAnalyzer.MustMatchTypeNameDiagnosticId, diagnostic.Id);
+        Assert.Equal("Type 'ArcaneHandler' name must start with 'I' and end with 'Service'", diagnostic.GetMessage());
+    }
+
+    [Fact]
+    public async Task ReportsNoDiagnostic_When_TypeNameConstraintIsForwardedThroughGenericMethod()
+    {
+        const string source = """
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IRegistry
+                              {
+                                  void Register<[MustMatchTypeName(prefix: "I")] TService>();
+                              }
+
+                              public sealed class Registry : IRegistry
+                              {
+                                  public void Register<[MustMatchTypeName(prefix: "I")] TService>()
+                                  {
+                                  }
+
+                                  void IRegistry.Register<[MustMatchTypeName(prefix: "I")] TService>()
+                                  {
+                                      Register<TService>();
+                                  }
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ReportsDiagnostic_When_TypeNameConstraintIsConfiguredWithoutPrefixAndSuffix()
+    {
+        const string source = """
+                              using AdvancedGenericTypeConstraints;
+
+                              public interface IRegistry
+                              {
+                                  void Register<[MustMatchTypeName] TService>();
+                              }
+                              """;
+
+        var diagnostics = await GetDiagnosticsAsync(source);
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(AdvancedGenericTypeConstraintAnalyzer.InvalidTypeNameConstraintConfigurationDiagnosticId, diagnostic.Id);
+        Assert.Equal(
+            "Generic parameter 'TService' declares MustMatchTypeName without a prefix or suffix",
+            diagnostic.GetMessage());
+    }
+
+    [Fact]
     public async Task ReportsNoDiagnostic_When_MustImplementConstraintIsForwardedThroughGenericMethod()
     {
         const string source = """

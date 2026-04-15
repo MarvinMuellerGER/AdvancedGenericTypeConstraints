@@ -1,9 +1,13 @@
 # NuGet Package Consumer
 
-This sample shows how a consuming project references the published NuGet packages:
+This sample shows how a consuming project uses the constraints and analyzer:
 
-- `AdvancedGenericTypeConstraints.Abstractions` `0.3.0`
-- `AdvancedGenericTypeConstraints.Analyzers` `0.3.0`
+- `AdvancedGenericTypeConstraints.Abstractions` `0.4.0`
+- `AdvancedGenericTypeConstraints.Analyzers` `0.4.0`
+
+By default, `NuGetPackageConsumer.csproj` uses local `ProjectReference`s (`UseLocalProjects=true`) so the sample is
+always aligned with the current repository state. Set `UseLocalProjects=false` to consume published NuGet packages
+instead.
 
 The sample intentionally triggers each analyzer rule exactly once during build:
 
@@ -18,3 +22,5 @@ The sample intentionally triggers each analyzer rule exactly once during build:
 - `AGTC009` `Type` argument is not a reference type
 - `AGTC010` `Type` argument is not assignable to the related `Type` argument
 - `AGTC011` invalid `MustBeAssignableTo` related-parameter reference
+- `AGTC012` generic type argument name does not match configured prefix/suffix
+- `AGTC013` invalid `MustMatchTypeName` configuration (missing prefix and suffix)

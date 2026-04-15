@@ -104,6 +104,24 @@ internal static class ConstraintDiagnostics
         true,
         "A MustBeAssignableTo constraint must reference another System.Type method parameter on the same method.");
 
+    public static readonly DiagnosticDescriptor MustMatchTypeNameRule = new(
+        AdvancedGenericTypeConstraintAnalyzer.MustMatchTypeNameDiagnosticId,
+        "Type argument name must match the configured naming rule",
+        "Type '{0}' name must start with '{1}' and end with '{2}'",
+        "Usage",
+        DiagnosticSeverity.Error,
+        true,
+        "Ensures that a generic type argument name matches the configured prefix and suffix.");
+
+    public static readonly DiagnosticDescriptor InvalidTypeNameConstraintConfigurationRule = new(
+        AdvancedGenericTypeConstraintAnalyzer.InvalidTypeNameConstraintConfigurationDiagnosticId,
+        "The type name constraint must define at least a prefix or suffix",
+        "Generic parameter '{0}' declares MustMatchTypeName without a prefix or suffix",
+        "Usage",
+        DiagnosticSeverity.Error,
+        true,
+        "A MustMatchTypeName constraint must configure at least one non-empty value.");
+
     public static ImmutableArray<DiagnosticDescriptor> All =>
     [
         MustImplementRule,
@@ -116,6 +134,8 @@ internal static class ConstraintDiagnostics
         MustBeOpenGenericTypeRule,
         MustBeReferenceTypeRule,
         MustBeAssignableToRule,
-        InvalidAssignableToConstraintConfigurationRule
+        InvalidAssignableToConstraintConfigurationRule,
+        MustMatchTypeNameRule,
+        InvalidTypeNameConstraintConfigurationRule
     ];
 }

@@ -25,6 +25,8 @@ public sealed class PlainHandler;
 [Marker]
 public sealed class DecoratedHandler;
 
+public sealed class RandomComponent;
+
 public sealed class ServiceImplementation;
 
 public interface IOpenGenericService<T>;
@@ -43,6 +45,10 @@ public interface IDemoRegistry
         [MustMatchAssemblyNameOf(nameof(TImplementation), suffix: ".Contracts")]
         TService,
         TImplementation>();
+
+    void RequireTypeName<[MustMatchTypeName(prefix: "I", suffix: "Service")] T>();
+
+    void InvalidTypeNameConfig<[MustMatchTypeName] T>();
 
     void InvalidMustImplementConfig<
         [MustImplementOpenGeneric(typeof(MessageHandler<>))]
@@ -70,6 +76,7 @@ public static class Program
         registry.RequireExactlyOne<DuplicateHandler>();
         registry.RequireAttribute<PlainHandler>();
         registry.RequireAssemblyMatch<DecoratedHandler, ServiceImplementation>();
+        registry.RequireTypeName<RandomComponent>();
         registry.RequireOpenGenericType(typeof(IOpenGenericService<>), typeof(ServiceImplementation));
     }
 }

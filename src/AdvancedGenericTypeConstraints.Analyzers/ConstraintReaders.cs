@@ -125,6 +125,30 @@ internal static class ConstraintReaders
         return builder.ToImmutable();
     }
 
+    public static ImmutableArray<TypeNameConstraint> GetTypeNameConstraints(
+        ITypeParameterSymbol typeParameter,
+        INamedTypeSymbol? attributeSymbol)
+    {
+        if (attributeSymbol is null)
+            return [];
+
+        var builder = ImmutableArray.CreateBuilder<TypeNameConstraint>();
+        var relevantAttributes = typeParameter.GetAttributes().Where(attribute =>
+            SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeSymbol) &&
+            attribute.ConstructorArguments.Length is >= 0 and <= 2);
+
+        foreach (var attribute in relevantAttributes)
+            builder.Add(new TypeNameConstraint(
+                attribute.ConstructorArguments.Length >= 1
+                    ? attribute.ConstructorArguments[0].Value as string ?? string.Empty
+                    : string.Empty,
+                attribute.ConstructorArguments.Length is 2
+                    ? attribute.ConstructorArguments[1].Value as string ?? string.Empty
+                    : string.Empty));
+
+        return builder.ToImmutable();
+    }
+
     private static ImmutableArray<INamedTypeSymbol> GetAllowedTypes(AttributeData attribute)
     {
         foreach (var namedArgument in attribute.NamedArguments.Where(namedArgument =>

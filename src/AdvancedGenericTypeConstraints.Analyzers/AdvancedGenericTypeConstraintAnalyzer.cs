@@ -68,6 +68,16 @@ public sealed class AdvancedGenericTypeConstraintAnalyzer : DiagnosticAnalyzer
     /// </summary>
     public const string InvalidAssignableToConstraintConfigurationDiagnosticId = "AGTC011";
 
+    /// <summary>
+    /// Diagnostic emitted when a type argument name does not match the configured prefix and/or suffix.
+    /// </summary>
+    public const string MustMatchTypeNameDiagnosticId = "AGTC012";
+
+    /// <summary>
+    /// Diagnostic emitted when a MustMatchTypeName constraint is configured without a prefix and suffix.
+    /// </summary>
+    public const string InvalidTypeNameConstraintConfigurationDiagnosticId = "AGTC013";
+
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ConstraintDiagnostics.All;
 

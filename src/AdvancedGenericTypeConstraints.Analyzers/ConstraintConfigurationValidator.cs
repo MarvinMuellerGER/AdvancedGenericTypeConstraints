@@ -41,6 +41,10 @@ internal static class ConstraintConfigurationValidator
                     typeParameters,
                     symbols.MustMatchAssemblyNameOfAttribute,
                     reportDiagnostic);
+
+            if (symbols.MustMatchTypeNameAttribute is not null)
+                ValidateTypeNameConstraintConfiguration(typeParameter, symbols.MustMatchTypeNameAttribute,
+                    reportDiagnostic);
         }
     }
 
@@ -163,6 +167,32 @@ internal static class ConstraintConfigurationValidator
                 GetAttributeLocation(attribute, parameter),
                 parameter.Name,
                 otherParameterName));
+        }
+    }
+
+    private static void ValidateTypeNameConstraintConfiguration(
+        ITypeParameterSymbol typeParameter,
+        INamedTypeSymbol attributeSymbol,
+        Action<Diagnostic> reportDiagnostic)
+    {
+        foreach (var attribute in typeParameter.GetAttributes().Where(attribute =>
+                     SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeSymbol) &&
+                     attribute.ConstructorArguments.Length is >= 0 and <= 2))
+        {
+            var prefix = attribute.ConstructorArguments.Length >= 1
+                ? attribute.ConstructorArguments[0].Value as string ?? string.Empty
+                : string.Empty;
+            var suffix = attribute.ConstructorArguments.Length is 2
+                ? attribute.ConstructorArguments[1].Value as string ?? string.Empty
+                : string.Empty;
+
+            if (!string.IsNullOrEmpty(prefix) || !string.IsNullOrEmpty(suffix))
+                continue;
+
+            reportDiagnostic(Diagnostic.Create(
+                ConstraintDiagnostics.InvalidTypeNameConstraintConfigurationRule,
+                GetAttributeLocation(attribute, typeParameter),
+                typeParameter.Name));
         }
     }
 
