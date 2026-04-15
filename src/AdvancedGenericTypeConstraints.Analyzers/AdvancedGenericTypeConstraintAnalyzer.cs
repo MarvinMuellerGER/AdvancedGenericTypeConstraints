@@ -100,35 +100,28 @@ public sealed class AdvancedGenericTypeConstraintAnalyzer : DiagnosticAnalyzer
                 OperationKind.Invocation);
 
             startContext.RegisterSyntaxNodeAction(
-                syntaxContext => AnalyzeGenericTypeUsage(syntaxContext, symbols, cache),
+                syntaxContext => AnalyzeGenericTypeUsage(syntaxContext, cache),
                 SyntaxKind.GenericName);
 
-            startContext.RegisterSymbolAction(
-                symbolContext => AnalyzeMethod(symbolContext, symbols, cache),
-                SymbolKind.Method);
+            startContext.RegisterSyntaxNodeAction(
+                syntaxContext => AnalyzeMethodDeclaration(syntaxContext, symbols, cache),
+                SyntaxKind.MethodDeclaration,
+                SyntaxKind.ConstructorDeclaration,
+                SyntaxKind.OperatorDeclaration,
+                SyntaxKind.ConversionOperatorDeclaration);
 
-            startContext.RegisterSymbolAction(
-                symbolContext => AnalyzeNamedType(symbolContext, symbols, cache),
-                SymbolKind.NamedType);
+            startContext.RegisterSyntaxNodeAction(
+                syntaxContext => AnalyzeDelegateDeclaration(syntaxContext, symbols, cache),
+                SyntaxKind.DelegateDeclaration);
+
+            startContext.RegisterSyntaxNodeAction(
+                syntaxContext => AnalyzeNamedTypeDeclaration(syntaxContext, symbols, cache),
+                SyntaxKind.ClassDeclaration,
+                SyntaxKind.StructDeclaration,
+                SyntaxKind.InterfaceDeclaration,
+                SyntaxKind.RecordDeclaration,
+                SyntaxKind.RecordStructDeclaration);
         });
-    }
-
-    private static void AnalyzeMethod(
-        SymbolAnalysisContext context,
-        ConstraintAttributeSymbols symbols,
-        ConstraintCache cache)
-    {
-        var method = (IMethodSymbol)context.Symbol;
-        ConstraintConfigurationValidator.Validate(method, symbols, cache, context.ReportDiagnostic);
-    }
-
-    private static void AnalyzeNamedType(
-        SymbolAnalysisContext context,
-        ConstraintAttributeSymbols symbols,
-        ConstraintCache cache)
-    {
-        var namedType = (INamedTypeSymbol)context.Symbol;
-        ConstraintConfigurationValidator.Validate(namedType.TypeParameters, symbols, cache, context.ReportDiagnostic);
     }
 
     private static void AnalyzeInvocation(
@@ -137,6 +130,9 @@ public sealed class AdvancedGenericTypeConstraintAnalyzer : DiagnosticAnalyzer
         ConstraintCache cache)
     {
         var invocation = (IInvocationOperation)context.Operation;
+        if (!cache.HasRelevantInvocationConstraints(invocation.TargetMethod))
+            return;
+
         TypeArgumentConstraintValidator.Validate(
             invocation.TargetMethod.TypeParameters,
             invocation.TargetMethod.TypeArguments,
@@ -153,14 +149,19 @@ public sealed class AdvancedGenericTypeConstraintAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeGenericTypeUsage(
         SyntaxNodeAnalysisContext context,
-        ConstraintAttributeSymbols symbols,
         ConstraintCache cache)
     {
         var genericName = (GenericNameSyntax)context.Node;
+        if (!IsPotentialGenericTypeUsage(genericName))
+            return;
+
         var symbol = ModelExtensions.GetSymbolInfo(context.SemanticModel, genericName, context.CancellationToken)
             .Symbol;
 
         if (symbol is not INamedTypeSymbol namedType || namedType.IsUnboundGenericType)
+            return;
+
+        if (!cache.HasRelevantTypeArgumentConstraints(namedType))
             return;
 
         TypeArgumentConstraintValidator.Validate(
@@ -170,4 +171,146 @@ public sealed class AdvancedGenericTypeConstraintAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic,
             cache);
     }
+
+    private static bool IsPotentialGenericTypeUsage(GenericNameSyntax genericName)
+    {
+        if (genericName.Parent is TypeArgumentListSyntax)
+            return false;
+
+        if (genericName.Parent is AttributeSyntax)
+            return false;
+
+        if (genericName.Parent is NameMemberCrefSyntax or QualifiedCrefSyntax)
+            return false;
+
+        return genericName.Parent switch
+        {
+            InvocationExpressionSyntax { Expression: var expression } => !ReferenceEquals(expression, genericName),
+            MemberAccessExpressionSyntax memberAccess when ReferenceEquals(memberAccess.Name, genericName) &&
+                                                        memberAccess.Parent is InvocationExpressionSyntax
+                => false,
+            MemberBindingExpressionSyntax memberBinding when ReferenceEquals(memberBinding.Name, genericName) &&
+                                                            memberBinding.Parent?.Parent is ConditionalAccessExpressionSyntax
+                                                            {
+                                                                Parent: InvocationExpressionSyntax
+                                                            }
+                => false,
+            _ => true
+        };
+    }
+
+    private static void AnalyzeMethodDeclaration(
+        SyntaxNodeAnalysisContext context,
+        ConstraintAttributeSymbols symbols,
+        ConstraintCache cache)
+    {
+        if (!HasRelevantMethodConfigurationAttributes(context.Node))
+            return;
+
+        if (context.SemanticModel.GetDeclaredSymbol(context.Node, context.CancellationToken) is not IMethodSymbol method)
+            return;
+
+        ConstraintConfigurationValidator.Validate(method, symbols, cache, context.ReportDiagnostic);
+    }
+
+    private static void AnalyzeDelegateDeclaration(
+        SyntaxNodeAnalysisContext context,
+        ConstraintAttributeSymbols symbols,
+        ConstraintCache cache)
+    {
+        var delegateDeclaration = (DelegateDeclarationSyntax)context.Node;
+        if (!HasRelevantTypeParameterConfigurationAttributes(delegateDeclaration.TypeParameterList))
+            return;
+
+        if (context.SemanticModel.GetDeclaredSymbol(delegateDeclaration, context.CancellationToken) is not INamedTypeSymbol namedType)
+            return;
+
+        ConstraintConfigurationValidator.Validate(namedType.TypeParameters, symbols, cache, context.ReportDiagnostic);
+    }
+
+    private static void AnalyzeNamedTypeDeclaration(
+        SyntaxNodeAnalysisContext context,
+        ConstraintAttributeSymbols symbols,
+        ConstraintCache cache)
+    {
+        var typeDeclaration = (TypeDeclarationSyntax)context.Node;
+        if (!HasRelevantTypeParameterConfigurationAttributes(typeDeclaration.TypeParameterList))
+            return;
+
+        if (context.SemanticModel.GetDeclaredSymbol(typeDeclaration, context.CancellationToken) is not INamedTypeSymbol namedType)
+            return;
+
+        ConstraintConfigurationValidator.Validate(namedType.TypeParameters, symbols, cache, context.ReportDiagnostic);
+    }
+
+    private static bool HasRelevantMethodConfigurationAttributes(SyntaxNode node)
+    {
+        return node switch
+        {
+            BaseMethodDeclarationSyntax methodDeclaration =>
+                HasRelevantTypeParameterConfigurationAttributes(methodDeclaration switch
+                {
+                    MethodDeclarationSyntax method => method.TypeParameterList,
+                    _ => null
+                }) ||
+                HasRelevantParameterConfigurationAttributes(methodDeclaration.ParameterList),
+            _ => false
+        };
+    }
+
+    private static bool HasRelevantTypeParameterConfigurationAttributes(TypeParameterListSyntax? typeParameterList)
+    {
+        if (typeParameterList is null)
+            return false;
+
+        foreach (var typeParameter in typeParameterList.Parameters)
+        foreach (var attributeList in typeParameter.AttributeLists)
+        foreach (var attribute in attributeList.Attributes)
+        {
+            if (IsRelevantTypeParameterConfigurationAttribute(attribute))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasRelevantParameterConfigurationAttributes(ParameterListSyntax parameterList)
+    {
+        foreach (var parameter in parameterList.Parameters)
+        foreach (var attributeList in parameter.AttributeLists)
+        foreach (var attribute in attributeList.Attributes)
+        {
+            if (IsRelevantParameterConfigurationAttribute(attribute))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsRelevantTypeParameterConfigurationAttribute(AttributeSyntax attribute)
+    {
+        var name = GetUnqualifiedAttributeName(attribute.Name);
+        return name is "MustImplementOpenGeneric" or "MustImplementOpenGenericAttribute"
+            or "MustMatchAssemblyNameOf" or "MustMatchAssemblyNameOfAttribute"
+            or "MustMatchTypeName" or "MustMatchTypeNameAttribute";
+    }
+
+    private static bool IsRelevantParameterConfigurationAttribute(AttributeSyntax attribute)
+    {
+        var name = GetUnqualifiedAttributeName(attribute.Name);
+        return name is "MustMatchAssemblyNameOf" or "MustMatchAssemblyNameOfAttribute"
+            or "MustBeOpenGenericType" or "MustBeOpenGenericTypeAttribute"
+            or "MustBeReferenceType" or "MustBeReferenceTypeAttribute"
+            or "MustBeAssignableTo" or "MustBeAssignableToAttribute";
+    }
+
+    private static string GetUnqualifiedAttributeName(NameSyntax nameSyntax) =>
+        nameSyntax switch
+        {
+            IdentifierNameSyntax identifierName => identifierName.Identifier.ValueText,
+            QualifiedNameSyntax qualifiedName => GetUnqualifiedAttributeName(qualifiedName.Right),
+            AliasQualifiedNameSyntax aliasQualifiedName => aliasQualifiedName.Name.Identifier.ValueText,
+            GenericNameSyntax genericName => genericName.Identifier.ValueText,
+            _ => nameSyntax.ToString()
+        };
 }

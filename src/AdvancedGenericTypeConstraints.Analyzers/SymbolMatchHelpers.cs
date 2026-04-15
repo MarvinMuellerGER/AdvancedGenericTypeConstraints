@@ -41,6 +41,9 @@ internal static class SymbolMatchHelpers
     public static bool IsReferenceType(ITypeSymbol typeSymbol) => !typeSymbol.IsValueType;
 
     public static bool IsAssignableTo(ITypeSymbol sourceType, ITypeSymbol targetType)
+        => IsAssignableTo(sourceType, targetType, cache: null);
+
+    public static bool IsAssignableTo(ITypeSymbol sourceType, ITypeSymbol targetType, ConstraintCache? cache)
     {
         if (SymbolEqualityComparer.Default.Equals(sourceType, targetType))
             return true;
@@ -51,11 +54,11 @@ internal static class SymbolMatchHelpers
         if (targetNamedType.IsGenericType)
         {
             var targetOpenGeneric = targetNamedType.OriginalDefinition;
-            if (CountMatches(GetAllMatchingOpenGenerics(sourceType), targetOpenGeneric) > 0)
+            if (GetMatchCount(sourceType, targetOpenGeneric, cache) > 0)
                 return true;
 
             if (sourceNamedType.IsUnboundGenericType &&
-                CountMatches(GetAllMatchingOpenGenerics(sourceNamedType.OriginalDefinition), targetOpenGeneric) > 0)
+                GetMatchCount(sourceNamedType.OriginalDefinition, targetOpenGeneric, cache) > 0)
                 return true;
         }
 
@@ -98,4 +101,15 @@ internal static class SymbolMatchHelpers
 
     private static INamedTypeSymbol NormalizeForAssignability(INamedTypeSymbol namedType) =>
         namedType.IsGenericType ? namedType.OriginalDefinition : namedType;
+
+    private static int GetMatchCount(
+        ITypeSymbol typeSymbol,
+        INamedTypeSymbol targetOpenGeneric,
+        ConstraintCache? cache)
+    {
+        if (cache is not null)
+            return cache.GetOpenGenericMatchData(typeSymbol).CountMatches(targetOpenGeneric);
+
+        return CountMatches(GetAllMatchingOpenGenerics(typeSymbol), targetOpenGeneric);
+    }
 }

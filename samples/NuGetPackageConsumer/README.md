@@ -2,8 +2,8 @@
 
 This sample shows how a consuming project uses the constraints and analyzer:
 
-- `AdvancedGenericTypeConstraints.Abstractions` `0.4.0`
-- `AdvancedGenericTypeConstraints.Analyzers` `0.4.0`
+- `AdvancedGenericTypeConstraints.Abstractions` `0.4.1`
+- `AdvancedGenericTypeConstraints.Analyzers` `0.4.1`
 
 By default, `NuGetPackageConsumer.csproj` uses local `ProjectReference`s (`UseLocalProjects=true`) so the sample is
 always aligned with the current repository state. Set `UseLocalProjects=false` to consume published NuGet packages

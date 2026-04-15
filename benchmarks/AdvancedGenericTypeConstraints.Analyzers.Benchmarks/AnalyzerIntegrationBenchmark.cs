@@ -5,7 +5,7 @@ using CurrentAnalyzer = AdvancedGenericTypeConstraints.Analyzers.AdvancedGeneric
 
 namespace AdvancedGenericTypeConstraints.Analyzers.Benchmarks;
 
-[ShortRunJob]
+[SimpleJob(launchCount: 2, warmupCount: 8, iterationCount: 12)]
 [MemoryDiagnoser]
 public class AnalyzerIntegrationBenchmark
 {

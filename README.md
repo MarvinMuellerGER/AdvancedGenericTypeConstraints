@@ -26,8 +26,8 @@ Install both packages in the consuming project:
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="AdvancedGenericTypeConstraints.Abstractions" Version="0.4.0" />
-  <PackageReference Include="AdvancedGenericTypeConstraints.Analyzers" Version="0.4.0" PrivateAssets="all" />
+  <PackageReference Include="AdvancedGenericTypeConstraints.Abstractions" Version="0.4.1" />
+  <PackageReference Include="AdvancedGenericTypeConstraints.Analyzers" Version="0.4.1" PrivateAssets="all" />
 </ItemGroup>
 ```
 

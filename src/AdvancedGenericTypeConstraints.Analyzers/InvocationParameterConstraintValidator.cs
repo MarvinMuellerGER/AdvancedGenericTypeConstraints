@@ -18,8 +18,9 @@ internal static class InvocationParameterConstraintValidator
             symbols.MustBeAssignableToAttribute is null)
             return;
 
-        var parameters = invocation.TargetMethod.Parameters;
-        var parameterIndices = BuildParameterIndexMap(parameters);
+        var method = invocation.TargetMethod;
+        var parameters = method.Parameters;
+        var parameterIndices = cache.GetParameterIndexMap(method);
         var argumentsByOrdinal = new IArgumentOperation?[parameters.Length];
         foreach (var invocationArgument in invocation.Arguments)
             if (invocationArgument.Parameter is { Ordinal: >= 0 } parameter)
@@ -28,6 +29,9 @@ internal static class InvocationParameterConstraintValidator
         foreach (var parameter in parameters)
         {
             var parameterConstraints = cache.GetParameterConstraints(parameter);
+            if (!parameterConstraints.HasAny)
+                continue;
+
             var argument = argumentsByOrdinal[parameter.Ordinal];
             if (argument is null)
                 continue;
@@ -193,7 +197,7 @@ internal static class InvocationParameterConstraintValidator
             var otherTypeArgument = TryGetRepresentedType(otherArgument.Value);
             if (typeArgument is not null && otherTypeArgument is not null)
             {
-                if (SymbolMatchHelpers.IsAssignableTo(typeArgument, otherTypeArgument))
+                if (SymbolMatchHelpers.IsAssignableTo(typeArgument, otherTypeArgument, cache))
                     continue;
 
                 reportDiagnostic(Diagnostic.Create(
@@ -248,19 +252,42 @@ internal static class InvocationParameterConstraintValidator
         if (forwardedParameter is null || forwardedOtherParameter is null)
             return false;
 
-        return cache.GetParameterConstraints(forwardedParameter).AssemblyNameConstraints.Where(candidate =>
-            string.Equals(candidate.Prefix, requiredConstraint.Prefix, StringComparison.Ordinal) &&
-            string.Equals(candidate.Suffix, requiredConstraint.Suffix, StringComparison.Ordinal) &&
-            IsAllowedTypeSubset(candidate.AllowedTypes, requiredConstraint.AllowedTypes)).Any(candidate =>
-            string.Equals(candidate.OtherTypeParameterName, forwardedOtherParameter.Name, StringComparison.Ordinal));
+        foreach (var candidate in cache.GetParameterConstraints(forwardedParameter).AssemblyNameConstraints)
+        {
+            if (!string.Equals(candidate.Prefix, requiredConstraint.Prefix, StringComparison.Ordinal) ||
+                !string.Equals(candidate.Suffix, requiredConstraint.Suffix, StringComparison.Ordinal) ||
+                !IsAllowedTypeSubset(candidate.AllowedTypes, requiredConstraint.AllowedTypes))
+                continue;
+
+            if (string.Equals(candidate.OtherTypeParameterName, forwardedOtherParameter.Name, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
     }
 
     private static bool IsAllowedTypeSubset(
         ImmutableArray<INamedTypeSymbol> candidateAllowedTypes,
-        ImmutableArray<INamedTypeSymbol> requiredAllowedTypes) =>
-        Enumerable.All(candidateAllowedTypes,
-            candidateAllowedType => requiredAllowedTypes.Any(requiredAllowedType =>
-                SymbolEqualityComparer.Default.Equals(candidateAllowedType, requiredAllowedType)));
+        ImmutableArray<INamedTypeSymbol> requiredAllowedTypes)
+    {
+        foreach (var candidateAllowedType in candidateAllowedTypes)
+        {
+            var found = false;
+            foreach (var requiredAllowedType in requiredAllowedTypes)
+            {
+                if (!SymbolEqualityComparer.Default.Equals(candidateAllowedType, requiredAllowedType))
+                    continue;
+
+                found = true;
+                break;
+            }
+
+            if (!found)
+                return false;
+        }
+
+        return true;
+    }
 
     private static bool HasEquivalentOrStrongerAssignableToConstraint(
         IArgumentOperation argument,
@@ -294,15 +321,6 @@ internal static class InvocationParameterConstraintValidator
         var forwardedParameter = TryGetForwardedParameter(operation);
         return forwardedParameter is not null &&
                cache.GetParameterConstraints(forwardedParameter).RequiresReferenceType;
-    }
-
-    private static Dictionary<string, int> BuildParameterIndexMap(ImmutableArray<IParameterSymbol> parameters)
-    {
-        var result = new Dictionary<string, int>(parameters.Length, StringComparer.Ordinal);
-        for (var index = 0; index < parameters.Length; index++)
-            result[parameters[index].Name] = index;
-
-        return result;
     }
 
     private static IParameterSymbol? TryGetForwardedParameter(IOperation operation)
