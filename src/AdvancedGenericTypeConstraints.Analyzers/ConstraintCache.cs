@@ -4,20 +4,15 @@ using Microsoft.CodeAnalysis;
 
 namespace AdvancedGenericTypeConstraints.Analyzers;
 
-internal sealed class ConstraintCache
+internal sealed class ConstraintCache(Compilation compilation, ConstraintAttributeSymbols symbols)
 {
-    private readonly ConstraintAttributeSymbols _symbols;
-    private readonly INamedTypeSymbol? _systemTypeSymbol;
-    private readonly ConcurrentDictionary<ITypeParameterSymbol, TypeParameterConstraintData> _typeParameterConstraints =
-        new(SymbolEqualityComparer.Default);
     private readonly ConcurrentDictionary<IParameterSymbol, ParameterConstraintData> _parameterConstraints =
         new(SymbolEqualityComparer.Default);
 
-    public ConstraintCache(Compilation compilation, ConstraintAttributeSymbols symbols)
-    {
-        _symbols = symbols;
-        _systemTypeSymbol = compilation.GetTypeByMetadataName("System.Type");
-    }
+    private readonly INamedTypeSymbol? _systemTypeSymbol = compilation.GetTypeByMetadataName("System.Type");
+
+    private readonly ConcurrentDictionary<ITypeParameterSymbol, TypeParameterConstraintData> _typeParameterConstraints =
+        new(SymbolEqualityComparer.Default);
 
     public TypeParameterConstraintData GetTypeParameterConstraints(ITypeParameterSymbol typeParameter) =>
         _typeParameterConstraints.GetOrAdd(typeParameter, CreateTypeParameterConstraintData);
@@ -31,35 +26,27 @@ internal sealed class ConstraintCache
 
     private TypeParameterConstraintData CreateTypeParameterConstraintData(ITypeParameterSymbol typeParameter) =>
         new(
-            ConstraintReaders.GetMustImplementConstraints(typeParameter, _symbols.MustImplementAttribute),
-            ConstraintReaders.GetMustNotImplementConstraints(typeParameter, _symbols.MustNotImplementAttribute),
-            ConstraintReaders.GetMustHaveAttributeConstraints(typeParameter, _symbols.MustHaveAttribute),
-            ConstraintReaders.GetAssemblyNameConstraints(typeParameter, _symbols.MustMatchAssemblyNameOfAttribute),
-            ConstraintReaders.GetTypeNameConstraints(typeParameter, _symbols.MustMatchTypeNameAttribute));
+            ConstraintReaders.GetMustImplementConstraints(typeParameter, symbols.MustImplementAttribute),
+            ConstraintReaders.GetMustNotImplementConstraints(typeParameter, symbols.MustNotImplementAttribute),
+            ConstraintReaders.GetMustHaveAttributeConstraints(typeParameter, symbols.MustHaveAttribute),
+            ConstraintReaders.GetAssemblyNameConstraints(typeParameter, symbols.MustMatchAssemblyNameOfAttribute),
+            ConstraintReaders.GetTypeNameConstraints(typeParameter, symbols.MustMatchTypeNameAttribute));
 
     private ParameterConstraintData CreateParameterConstraintData(IParameterSymbol parameter)
     {
         var attributes = parameter.GetAttributes();
 
         return new ParameterConstraintData(
-            ConstraintReaders.GetAssemblyNameConstraints(attributes, _symbols.MustMatchAssemblyNameOfAttribute),
-            ConstraintReaders.GetAssignableToConstraints(attributes, _symbols.MustBeAssignableToAttribute),
-            HasAttribute(attributes, _symbols.MustBeOpenGenericTypeAttribute),
-            HasAttribute(attributes, _symbols.MustBeReferenceTypeAttribute));
+            ConstraintReaders.GetAssemblyNameConstraints(attributes, symbols.MustMatchAssemblyNameOfAttribute),
+            ConstraintReaders.GetAssignableToConstraints(attributes, symbols.MustBeAssignableToAttribute),
+            HasAttribute(attributes, symbols.MustBeOpenGenericTypeAttribute),
+            HasAttribute(attributes, symbols.MustBeReferenceTypeAttribute));
     }
 
     private static bool HasAttribute(ImmutableArray<AttributeData> attributes, INamedTypeSymbol? attributeSymbol)
     {
-        if (attributeSymbol is null)
-            return false;
-
-        foreach (var attribute in attributes)
-        {
-            if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeSymbol))
-                return true;
-        }
-
-        return false;
+        return attributeSymbol is not null && attributes.Any(attribute =>
+            SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeSymbol));
     }
 }
 

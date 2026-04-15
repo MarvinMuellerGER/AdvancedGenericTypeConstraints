@@ -9,7 +9,8 @@ internal static class InvocationParameterConstraintValidator
     public static void Validate(
         IInvocationOperation invocation,
         Action<Diagnostic> reportDiagnostic,
-        ConstraintAttributeSymbols symbols)
+        ConstraintAttributeSymbols symbols,
+        ConstraintCache cache)
     {
         if (symbols.MustMatchAssemblyNameOfAttribute is null &&
             symbols.MustBeOpenGenericTypeAttribute is null &&
@@ -17,38 +18,46 @@ internal static class InvocationParameterConstraintValidator
             symbols.MustBeAssignableToAttribute is null)
             return;
 
-        var argumentsByParameter = new Dictionary<ISymbol, IArgumentOperation>(SymbolEqualityComparer.Default);
+        var parameters = invocation.TargetMethod.Parameters;
+        var parameterIndices = BuildParameterIndexMap(parameters);
+        var argumentsByOrdinal = new IArgumentOperation?[parameters.Length];
         foreach (var invocationArgument in invocation.Arguments)
-        {
-            if (invocationArgument.Parameter is not null)
-                argumentsByParameter[invocationArgument.Parameter] = invocationArgument;
-        }
+            if (invocationArgument.Parameter is { Ordinal: >= 0 } parameter)
+                argumentsByOrdinal[parameter.Ordinal] = invocationArgument;
 
-        foreach (var parameter in invocation.TargetMethod.Parameters)
+        foreach (var parameter in parameters)
         {
-            if (!argumentsByParameter.TryGetValue(parameter, out var argument))
+            var parameterConstraints = cache.GetParameterConstraints(parameter);
+            var argument = argumentsByOrdinal[parameter.Ordinal];
+            if (argument is null)
                 continue;
 
             var typeArgument = TryGetRepresentedType(argument.Value);
-            ValidateMustBeOpenGenericType(parameter, typeArgument, argument, reportDiagnostic, symbols);
-            ValidateMustBeReferenceType(parameter, typeArgument, argument, reportDiagnostic, symbols);
+            ValidateMustBeOpenGenericType(parameter, parameterConstraints, typeArgument, argument, reportDiagnostic,
+                cache);
+            ValidateMustBeReferenceType(parameter, parameterConstraints, typeArgument, argument, reportDiagnostic,
+                cache);
             ValidateMustBeAssignableTo(
-                invocation,
                 parameter,
+                parameterConstraints,
                 typeArgument,
                 argument,
-                argumentsByParameter,
+                parameters,
+                parameterIndices,
+                argumentsByOrdinal,
                 reportDiagnostic,
-                symbols);
+                cache);
 
-            foreach (var assemblyConstraint in ConstraintReaders.GetAssemblyNameConstraints(
-                         parameter,
-                         symbols.MustMatchAssemblyNameOfAttribute))
+            foreach (var assemblyConstraint in parameterConstraints.AssemblyNameConstraints)
             {
-                var otherParameter = invocation.TargetMethod.Parameters.FirstOrDefault(candidate =>
-                    string.Equals(candidate.Name, assemblyConstraint.OtherTypeParameterName, StringComparison.Ordinal));
-                if (otherParameter is null || !argumentsByParameter.TryGetValue(otherParameter, out var otherArgument))
+                if (!parameterIndices.TryGetValue(assemblyConstraint.OtherTypeParameterName, out var otherIndex))
                     continue;
+
+                var otherArgument = argumentsByOrdinal[otherIndex];
+                if (otherArgument is null)
+                    continue;
+
+                var otherParameter = parameters[otherIndex];
 
                 var otherTypeArgument = TryGetRepresentedType(otherArgument.Value);
                 if (typeArgument is not null &&
@@ -57,7 +66,7 @@ internal static class InvocationParameterConstraintValidator
 
                 if (typeArgument is null || otherTypeArgument is null)
                 {
-                    if (HasEquivalentOrStrongerAssemblyConstraint(argument, otherArgument, assemblyConstraint, symbols))
+                    if (HasEquivalentOrStrongerAssemblyConstraint(argument, otherArgument, assemblyConstraint, cache))
                         continue;
 
                     var forwardedParameter = TryGetForwardedParameter(argument.Value);
@@ -82,7 +91,7 @@ internal static class InvocationParameterConstraintValidator
                     continue;
                 }
 
-                if (HasEquivalentOrStrongerAssemblyConstraint(argument, otherArgument, assemblyConstraint, symbols))
+                if (HasEquivalentOrStrongerAssemblyConstraint(argument, otherArgument, assemblyConstraint, cache))
                     continue;
 
                 var expectedAssemblyName = assemblyConstraint.Prefix +
@@ -96,7 +105,7 @@ internal static class InvocationParameterConstraintValidator
                         typeArgument,
                         otherTypeArgument,
                         assemblyConstraint,
-                        symbols))
+                        cache))
                     continue;
 
                 reportDiagnostic(Diagnostic.Create(
@@ -111,23 +120,19 @@ internal static class InvocationParameterConstraintValidator
 
     private static void ValidateMustBeOpenGenericType(
         IParameterSymbol parameter,
+        ParameterConstraintData parameterConstraints,
         ITypeSymbol? typeArgument,
         IArgumentOperation argument,
         Action<Diagnostic> reportDiagnostic,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
-        if (symbols.MustBeOpenGenericTypeAttribute is null)
-            return;
-
-        if (!parameter.GetAttributes().Any(attribute =>
-                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass,
-                    symbols.MustBeOpenGenericTypeAttribute)))
+        if (!parameterConstraints.RequiresOpenGenericType)
             return;
 
         if (typeArgument is not null && SymbolMatchHelpers.IsOpenGenericTypeDefinition(typeArgument))
             return;
 
-        if (IsForwardedOpenGenericTypeConstraint(argument.Value, symbols))
+        if (IsForwardedOpenGenericTypeConstraint(argument.Value, cache))
             return;
 
         reportDiagnostic(Diagnostic.Create(
@@ -140,22 +145,19 @@ internal static class InvocationParameterConstraintValidator
 
     private static void ValidateMustBeReferenceType(
         IParameterSymbol parameter,
+        ParameterConstraintData parameterConstraints,
         ITypeSymbol? typeArgument,
         IArgumentOperation argument,
         Action<Diagnostic> reportDiagnostic,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
-        if (symbols.MustBeReferenceTypeAttribute is null)
-            return;
-
-        if (!parameter.GetAttributes().Any(attribute =>
-                SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, symbols.MustBeReferenceTypeAttribute)))
+        if (!parameterConstraints.RequiresReferenceType)
             return;
 
         if (typeArgument is not null && SymbolMatchHelpers.IsReferenceType(typeArgument))
             return;
 
-        if (HasEquivalentAttribute(argument.Value, symbols.MustBeReferenceTypeAttribute))
+        if (HasEquivalentReferenceTypeAttribute(argument.Value, cache))
             return;
 
         reportDiagnostic(Diagnostic.Create(
@@ -167,22 +169,26 @@ internal static class InvocationParameterConstraintValidator
     }
 
     private static void ValidateMustBeAssignableTo(
-        IInvocationOperation invocation,
         IParameterSymbol parameter,
+        ParameterConstraintData parameterConstraints,
         ITypeSymbol? typeArgument,
         IArgumentOperation argument,
-        IReadOnlyDictionary<ISymbol, IArgumentOperation> argumentsByParameter,
+        ImmutableArray<IParameterSymbol> parameters,
+        IReadOnlyDictionary<string, int> parameterIndices,
+        IArgumentOperation?[] argumentsByOrdinal,
         Action<Diagnostic> reportDiagnostic,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
-        foreach (var assignableConstraint in ConstraintReaders.GetAssignableToConstraints(
-                     parameter,
-                     symbols.MustBeAssignableToAttribute))
+        foreach (var assignableConstraint in parameterConstraints.AssignableToConstraints)
         {
-            var otherParameter = invocation.TargetMethod.Parameters.FirstOrDefault(candidate =>
-                string.Equals(candidate.Name, assignableConstraint.OtherParameterName, StringComparison.Ordinal));
-            if (otherParameter is null || !argumentsByParameter.TryGetValue(otherParameter, out var otherArgument))
+            if (!parameterIndices.TryGetValue(assignableConstraint.OtherParameterName, out var otherIndex))
                 continue;
+
+            var otherArgument = argumentsByOrdinal[otherIndex];
+            if (otherArgument is null)
+                continue;
+
+            var otherParameter = parameters[otherIndex];
 
             var otherTypeArgument = TryGetRepresentedType(otherArgument.Value);
             if (typeArgument is not null && otherTypeArgument is not null)
@@ -199,7 +205,7 @@ internal static class InvocationParameterConstraintValidator
                 continue;
             }
 
-            if (HasEquivalentOrStrongerAssignableToConstraint(argument, otherArgument, symbols))
+            if (HasEquivalentOrStrongerAssignableToConstraint(argument, otherArgument, cache))
                 continue;
 
             reportDiagnostic(Diagnostic.Create(
@@ -228,42 +234,25 @@ internal static class InvocationParameterConstraintValidator
 
     private static bool IsForwardedOpenGenericTypeConstraint(
         IOperation operation,
-        ConstraintAttributeSymbols symbols)
-    {
-        if (symbols.MustBeOpenGenericTypeAttribute is null)
-            return false;
-
-        return HasEquivalentAttribute(operation, symbols.MustBeOpenGenericTypeAttribute);
-    }
+        ConstraintCache cache) =>
+        HasForwardedOpenGenericTypeAttribute(operation, cache);
 
     private static bool HasEquivalentOrStrongerAssemblyConstraint(
         IArgumentOperation argument,
         IArgumentOperation otherArgument,
         AssemblyNameConstraint requiredConstraint,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
-        if (symbols.MustMatchAssemblyNameOfAttribute is null)
-            return false;
-
         var forwardedParameter = TryGetForwardedParameter(argument.Value);
         var forwardedOtherParameter = TryGetForwardedParameter(otherArgument.Value);
         if (forwardedParameter is null || forwardedOtherParameter is null)
             return false;
 
-        foreach (var candidate in ConstraintReaders.GetAssemblyNameConstraints(
-                     forwardedParameter,
-                     symbols.MustMatchAssemblyNameOfAttribute))
-        {
-            if (!string.Equals(candidate.Prefix, requiredConstraint.Prefix, StringComparison.Ordinal) ||
-                !string.Equals(candidate.Suffix, requiredConstraint.Suffix, StringComparison.Ordinal) ||
-                !IsAllowedTypeSubset(candidate.AllowedTypes, requiredConstraint.AllowedTypes))
-                continue;
-
-            if (string.Equals(candidate.OtherTypeParameterName, forwardedOtherParameter.Name, StringComparison.Ordinal))
-                return true;
-        }
-
-        return false;
+        return cache.GetParameterConstraints(forwardedParameter).AssemblyNameConstraints.Where(candidate =>
+            string.Equals(candidate.Prefix, requiredConstraint.Prefix, StringComparison.Ordinal) &&
+            string.Equals(candidate.Suffix, requiredConstraint.Suffix, StringComparison.Ordinal) &&
+            IsAllowedTypeSubset(candidate.AllowedTypes, requiredConstraint.AllowedTypes)).Any(candidate =>
+            string.Equals(candidate.OtherTypeParameterName, forwardedOtherParameter.Name, StringComparison.Ordinal));
     }
 
     private static bool IsAllowedTypeSubset(
@@ -276,18 +265,16 @@ internal static class InvocationParameterConstraintValidator
     private static bool HasEquivalentOrStrongerAssignableToConstraint(
         IArgumentOperation argument,
         IArgumentOperation otherArgument,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
-        if (symbols.MustBeAssignableToAttribute is null)
-            return false;
-
         var forwardedParameter = TryGetForwardedParameter(argument.Value);
         var forwardedOtherParameter = TryGetForwardedParameter(otherArgument.Value);
         if (forwardedParameter is null || forwardedOtherParameter is null)
             return false;
 
-        return ConstraintReaders.GetAssignableToConstraints(forwardedParameter, symbols.MustBeAssignableToAttribute)
-            .Any(candidate => string.Equals(candidate.OtherParameterName, forwardedOtherParameter.Name, StringComparison.Ordinal));
+        return cache.GetParameterConstraints(forwardedParameter).AssignableToConstraints.Any(candidate =>
+            string.Equals(candidate.OtherParameterName, forwardedOtherParameter.Name,
+                StringComparison.Ordinal));
     }
 
     private static string FormatExpectedAssemblyName(
@@ -295,12 +282,27 @@ internal static class InvocationParameterConstraintValidator
         AssemblyNameConstraint requiredConstraint) =>
         requiredConstraint.Prefix + "{AssemblyOf(" + otherParameterName + ")}" + requiredConstraint.Suffix;
 
-    private static bool HasEquivalentAttribute(IOperation operation, INamedTypeSymbol attributeSymbol)
+    private static bool HasForwardedOpenGenericTypeAttribute(IOperation operation, ConstraintCache cache)
     {
         var forwardedParameter = TryGetForwardedParameter(operation);
         return forwardedParameter is not null &&
-               forwardedParameter.GetAttributes().Any(attribute =>
-                   SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeSymbol));
+               cache.GetParameterConstraints(forwardedParameter).RequiresOpenGenericType;
+    }
+
+    private static bool HasEquivalentReferenceTypeAttribute(IOperation operation, ConstraintCache cache)
+    {
+        var forwardedParameter = TryGetForwardedParameter(operation);
+        return forwardedParameter is not null &&
+               cache.GetParameterConstraints(forwardedParameter).RequiresReferenceType;
+    }
+
+    private static Dictionary<string, int> BuildParameterIndexMap(ImmutableArray<IParameterSymbol> parameters)
+    {
+        var result = new Dictionary<string, int>(parameters.Length, StringComparer.Ordinal);
+        for (var index = 0; index < parameters.Length; index++)
+            result[parameters[index].Name] = index;
+
+        return result;
     }
 
     private static IParameterSymbol? TryGetForwardedParameter(IOperation operation)

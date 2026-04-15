@@ -10,7 +10,7 @@ internal static class TypeArgumentConstraintValidator
         ImmutableArray<ITypeSymbol> typeArguments,
         Location location,
         Action<Diagnostic> reportDiagnostic,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
         var typeParameterIndices = BuildTypeParameterIndexMap(typeParameters);
 
@@ -18,33 +18,33 @@ internal static class TypeArgumentConstraintValidator
         {
             var typeParameter = typeParameters[index];
             var typeArgument = typeArguments[index];
+            var constraints = cache.GetTypeParameterConstraints(typeParameter);
             var matches = SymbolMatchHelpers.GetAllMatchingOpenGenerics(typeArgument);
 
-            ValidateMustImplement(typeParameter, typeArgument, matches, location, reportDiagnostic, symbols);
-            ValidateMustNotImplement(typeParameter, typeArgument, matches, location, reportDiagnostic, symbols);
-            ValidateMustHaveAttribute(typeParameter, typeArgument, location, reportDiagnostic, symbols);
-            ValidateAssemblyName(typeParameter, typeArgument, typeArguments, typeParameterIndices, location,
-                reportDiagnostic, symbols);
-            ValidateTypeName(typeParameter, typeArgument, location, reportDiagnostic, symbols);
+            ValidateMustImplement(constraints, typeArgument, matches, location, reportDiagnostic, cache);
+            ValidateMustNotImplement(constraints, typeArgument, matches, location, reportDiagnostic, cache);
+            ValidateMustHaveAttribute(constraints, typeArgument, location, reportDiagnostic, cache);
+            ValidateAssemblyName(typeParameter, constraints, typeArgument, typeArguments, typeParameterIndices, location,
+                reportDiagnostic, cache);
+            ValidateTypeName(constraints, typeArgument, location, reportDiagnostic, cache);
         }
     }
 
     private static void ValidateMustImplement(
-        ITypeParameterSymbol typeParameter,
+        TypeParameterConstraintData constraints,
         ITypeSymbol typeArgument,
         ImmutableArray<INamedTypeSymbol> matches,
         Location location,
         Action<Diagnostic> reportDiagnostic,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
-        foreach (var constraint in ConstraintReaders.GetMustImplementConstraints(typeParameter,
-                     symbols.MustImplementAttribute))
+        foreach (var constraint in constraints.MustImplementConstraints)
         {
             var matchCount = SymbolMatchHelpers.CountMatches(matches, constraint.OpenGenericType);
             if (constraint.ExactlyOne)
             {
                 if (matchCount is 1 ||
-                    HasEquivalentOrStrongerMustImplementConstraint(typeArgument, constraint, symbols))
+                    HasEquivalentOrStrongerMustImplementConstraint(typeArgument, constraint, cache))
                     continue;
 
                 reportDiagnostic(Diagnostic.Create(
@@ -56,7 +56,7 @@ internal static class TypeArgumentConstraintValidator
                 continue;
             }
 
-            if (matchCount > 0 || HasEquivalentOrStrongerMustImplementConstraint(typeArgument, constraint, symbols))
+            if (matchCount > 0 || HasEquivalentOrStrongerMustImplementConstraint(typeArgument, constraint, cache))
                 continue;
 
             reportDiagnostic(Diagnostic.Create(
@@ -68,37 +68,38 @@ internal static class TypeArgumentConstraintValidator
     }
 
     private static void ValidateMustNotImplement(
-        ITypeParameterSymbol typeParameter,
+        TypeParameterConstraintData constraints,
         ITypeSymbol typeArgument,
         ImmutableArray<INamedTypeSymbol> matches,
         Location location,
         Action<Diagnostic> reportDiagnostic,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
-        foreach (var forbiddenOpenGeneric in ConstraintReaders
-                     .GetMustNotImplementConstraints(typeParameter, symbols.MustNotImplementAttribute)
-                     .Where(forbiddenOpenGeneric =>
-                         SymbolMatchHelpers.CountMatches(matches, forbiddenOpenGeneric) is not 0 &&
-                         !HasEquivalentMustNotImplementConstraint(typeArgument, forbiddenOpenGeneric, symbols)))
+        foreach (var forbiddenOpenGeneric in constraints.MustNotImplementConstraints)
+        {
+            if (SymbolMatchHelpers.CountMatches(matches, forbiddenOpenGeneric) is 0 ||
+                HasEquivalentMustNotImplementConstraint(typeArgument, forbiddenOpenGeneric, cache))
+                continue;
+
             reportDiagnostic(Diagnostic.Create(
                 ConstraintDiagnostics.MustNotImplementRule,
                 location,
                 SymbolMatchHelpers.ToMinimalDisplayString(typeArgument),
                 SymbolMatchHelpers.ToOpenGenericDisplayString(forbiddenOpenGeneric)));
+        }
     }
 
     private static void ValidateMustHaveAttribute(
-        ITypeParameterSymbol typeParameter,
+        TypeParameterConstraintData constraints,
         ITypeSymbol typeArgument,
         Location location,
         Action<Diagnostic> reportDiagnostic,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
-        foreach (var requiredAttribute in ConstraintReaders.GetMustHaveAttributeConstraints(typeParameter,
-                     symbols.MustHaveAttribute))
+        foreach (var requiredAttribute in constraints.MustHaveAttributeConstraints)
         {
             if (SymbolMatchHelpers.TypeHasRequiredAttribute(typeArgument, requiredAttribute) ||
-                HasEquivalentMustHaveAttributeConstraint(typeArgument, requiredAttribute, symbols))
+                HasEquivalentMustHaveAttributeConstraint(typeArgument, requiredAttribute, cache))
                 continue;
 
             reportDiagnostic(Diagnostic.Create(
@@ -111,16 +112,15 @@ internal static class TypeArgumentConstraintValidator
 
     private static void ValidateAssemblyName(
         ITypeParameterSymbol typeParameter,
+        TypeParameterConstraintData constraints,
         ITypeSymbol typeArgument,
         ImmutableArray<ITypeSymbol> typeArguments,
         Dictionary<string, int> typeParameterIndices,
         Location location,
         Action<Diagnostic> reportDiagnostic,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
-        foreach (var assemblyConstraint in ConstraintReaders.GetAssemblyNameConstraints(
-                     typeParameter,
-                     symbols.MustMatchAssemblyNameOfAttribute))
+        foreach (var assemblyConstraint in constraints.AssemblyNameConstraints)
         {
             if (!typeParameterIndices.TryGetValue(assemblyConstraint.OtherTypeParameterName, out var otherIndex) ||
                 otherIndex >= typeArguments.Length ||
@@ -134,7 +134,7 @@ internal static class TypeArgumentConstraintValidator
             var actualAssemblyName = SymbolMatchHelpers.GetAssemblySimpleName(typeArgument.ContainingAssembly);
 
             if (string.Equals(expectedAssemblyName, actualAssemblyName, StringComparison.Ordinal) ||
-                HasEquivalentOrStrongerAssemblyConstraint(typeArgument, otherTypeArgument, assemblyConstraint, symbols))
+                HasEquivalentOrStrongerAssemblyConstraint(typeArgument, otherTypeArgument, assemblyConstraint, cache))
                 continue;
 
             reportDiagnostic(Diagnostic.Create(
@@ -147,18 +147,16 @@ internal static class TypeArgumentConstraintValidator
     }
 
     private static void ValidateTypeName(
-        ITypeParameterSymbol typeParameter,
+        TypeParameterConstraintData constraints,
         ITypeSymbol typeArgument,
         Location location,
         Action<Diagnostic> reportDiagnostic,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
-        foreach (var typeNameConstraint in ConstraintReaders.GetTypeNameConstraints(
-                     typeParameter,
-                     symbols.MustMatchTypeNameAttribute))
+        foreach (var typeNameConstraint in constraints.TypeNameConstraints)
         {
             if (TypeNameMatchesConstraint(typeArgument.Name, typeNameConstraint) ||
-                HasEquivalentOrStrongerTypeNameConstraint(typeArgument, typeNameConstraint, symbols))
+                HasEquivalentOrStrongerTypeNameConstraint(typeArgument, typeNameConstraint, cache))
                 continue;
 
             reportDiagnostic(Diagnostic.Create(
@@ -183,13 +181,12 @@ internal static class TypeArgumentConstraintValidator
     private static bool HasEquivalentOrStrongerMustImplementConstraint(
         ITypeSymbol typeArgument,
         MustImplementConstraint requiredConstraint,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
         if (typeArgument is not ITypeParameterSymbol typeParameter)
             return false;
 
-        foreach (var candidate in ConstraintReaders.GetMustImplementConstraints(typeParameter,
-                     symbols.MustImplementAttribute))
+        foreach (var candidate in cache.GetTypeParameterConstraints(typeParameter).MustImplementConstraints)
         {
             if (!SymbolEqualityComparer.Default.Equals(candidate.OpenGenericType, requiredConstraint.OpenGenericType))
                 continue;
@@ -204,36 +201,46 @@ internal static class TypeArgumentConstraintValidator
     private static bool HasEquivalentMustNotImplementConstraint(
         ITypeSymbol typeArgument,
         INamedTypeSymbol forbiddenOpenGeneric,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
         if (typeArgument is not ITypeParameterSymbol typeParameter)
             return false;
 
-        return ConstraintReaders.GetMustNotImplementConstraints(typeParameter, symbols.MustNotImplementAttribute)
-            .Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, forbiddenOpenGeneric));
+        foreach (var candidate in cache.GetTypeParameterConstraints(typeParameter).MustNotImplementConstraints)
+        {
+            if (SymbolEqualityComparer.Default.Equals(candidate, forbiddenOpenGeneric))
+                return true;
+        }
+
+        return false;
     }
 
     private static bool HasEquivalentMustHaveAttributeConstraint(
         ITypeSymbol typeArgument,
         INamedTypeSymbol requiredAttribute,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
         if (typeArgument is not ITypeParameterSymbol typeParameter)
             return false;
 
-        return ConstraintReaders.GetMustHaveAttributeConstraints(typeParameter, symbols.MustHaveAttribute)
-            .Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, requiredAttribute));
+        foreach (var candidate in cache.GetTypeParameterConstraints(typeParameter).MustHaveAttributeConstraints)
+        {
+            if (SymbolEqualityComparer.Default.Equals(candidate, requiredAttribute))
+                return true;
+        }
+
+        return false;
     }
 
     private static bool HasEquivalentOrStrongerTypeNameConstraint(
         ITypeSymbol typeArgument,
         TypeNameConstraint requiredConstraint,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
         if (typeArgument is not ITypeParameterSymbol typeParameter)
             return false;
 
-        foreach (var candidate in ConstraintReaders.GetTypeNameConstraints(typeParameter, symbols.MustMatchTypeNameAttribute))
+        foreach (var candidate in cache.GetTypeParameterConstraints(typeParameter).TypeNameConstraints)
             if (IsEquivalentOrStrongerTypeNameConstraint(candidate, requiredConstraint))
                 return true;
 
@@ -244,14 +251,12 @@ internal static class TypeArgumentConstraintValidator
         ITypeSymbol typeArgument,
         ITypeSymbol otherTypeArgument,
         AssemblyNameConstraint requiredConstraint,
-        ConstraintAttributeSymbols symbols)
+        ConstraintCache cache)
     {
         if (typeArgument is not ITypeParameterSymbol typeParameter)
             return false;
 
-        foreach (var candidate in ConstraintReaders.GetAssemblyNameConstraints(
-                     typeParameter,
-                     symbols.MustMatchAssemblyNameOfAttribute))
+        foreach (var candidate in cache.GetTypeParameterConstraints(typeParameter).AssemblyNameConstraints)
         {
             if (!string.Equals(candidate.Prefix, requiredConstraint.Prefix, StringComparison.Ordinal) ||
                 !string.Equals(candidate.Suffix, requiredConstraint.Suffix, StringComparison.Ordinal) ||

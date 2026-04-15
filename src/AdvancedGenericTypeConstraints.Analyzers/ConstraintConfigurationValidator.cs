@@ -8,26 +8,30 @@ internal static class ConstraintConfigurationValidator
     public static void Validate(
         IMethodSymbol method,
         ConstraintAttributeSymbols symbols,
+        ConstraintCache cache,
         Action<Diagnostic> reportDiagnostic)
     {
-        Validate(method.TypeParameters, symbols, reportDiagnostic);
+        Validate(method.TypeParameters, symbols, cache, reportDiagnostic);
 
         if (symbols.MustMatchAssemblyNameOfAttribute is not null)
             ValidateAssemblyConstraintConfiguration(
                 method.Parameters,
                 symbols.MustMatchAssemblyNameOfAttribute,
+                cache,
                 reportDiagnostic);
 
         if (symbols.MustBeAssignableToAttribute is not null)
             ValidateAssignableToConstraintConfiguration(
                 method.Parameters,
                 symbols.MustBeAssignableToAttribute,
+                cache,
                 reportDiagnostic);
     }
 
     public static void Validate(
         ImmutableArray<ITypeParameterSymbol> typeParameters,
         ConstraintAttributeSymbols symbols,
+        ConstraintCache cache,
         Action<Diagnostic> reportDiagnostic)
     {
         foreach (var typeParameter in typeParameters)
@@ -40,6 +44,7 @@ internal static class ConstraintConfigurationValidator
                     typeParameter,
                     typeParameters,
                     symbols.MustMatchAssemblyNameOfAttribute,
+                    cache,
                     reportDiagnostic);
 
             if (symbols.MustMatchTypeNameAttribute is not null)
@@ -51,6 +56,7 @@ internal static class ConstraintConfigurationValidator
     private static void ValidateAssemblyConstraintConfiguration(
         ImmutableArray<IParameterSymbol> parameters,
         INamedTypeSymbol attributeSymbol,
+        ConstraintCache cache,
         Action<Diagnostic> reportDiagnostic)
     {
         var availableNames = new HashSet<string>(
@@ -66,10 +72,10 @@ internal static class ConstraintConfigurationValidator
             var otherParameterName = (string)attribute.ConstructorArguments[0].Value!;
             var isInvalidReference = string.Equals(otherParameterName, parameter.Name, StringComparison.Ordinal) ||
                                      !availableNames.Contains(otherParameterName);
-            var isInvalidTypeUsage = !IsSystemType(parameter.Type) ||
+            var isInvalidTypeUsage = !cache.IsSystemType(parameter.Type) ||
                                      !parameters.Any(candidate =>
                                          string.Equals(candidate.Name, otherParameterName, StringComparison.Ordinal) &&
-                                         IsSystemType(candidate.Type));
+                                         cache.IsSystemType(candidate.Type));
 
             if (!isInvalidReference && !isInvalidTypeUsage)
                 continue;
@@ -110,6 +116,7 @@ internal static class ConstraintConfigurationValidator
         ITypeParameterSymbol typeParameter,
         ImmutableArray<ITypeParameterSymbol> availableTypeParameters,
         INamedTypeSymbol attributeSymbol,
+        ConstraintCache cache,
         Action<Diagnostic> reportDiagnostic)
     {
         var availableNames = new HashSet<string>(
@@ -137,6 +144,7 @@ internal static class ConstraintConfigurationValidator
     private static void ValidateAssignableToConstraintConfiguration(
         ImmutableArray<IParameterSymbol> parameters,
         INamedTypeSymbol attributeSymbol,
+        ConstraintCache cache,
         Action<Diagnostic> reportDiagnostic)
     {
         var availableNames = new HashSet<string>(
@@ -144,15 +152,15 @@ internal static class ConstraintConfigurationValidator
             StringComparer.Ordinal);
 
         foreach (var parameter in parameters)
-        foreach (var constraint in ConstraintReaders.GetAssignableToConstraints(parameter, attributeSymbol))
+        foreach (var constraint in cache.GetParameterConstraints(parameter).AssignableToConstraints)
         {
             var otherParameterName = constraint.OtherParameterName;
             var isInvalidReference = string.Equals(otherParameterName, parameter.Name, StringComparison.Ordinal) ||
                                      !availableNames.Contains(otherParameterName);
-            var isInvalidTypeUsage = !IsSystemType(parameter.Type) ||
+            var isInvalidTypeUsage = !cache.IsSystemType(parameter.Type) ||
                                      !parameters.Any(candidate =>
                                          string.Equals(candidate.Name, otherParameterName, StringComparison.Ordinal) &&
-                                         IsSystemType(candidate.Type));
+                                         cache.IsSystemType(candidate.Type));
 
             if (!isInvalidReference && !isInvalidTypeUsage)
                 continue;
@@ -195,10 +203,6 @@ internal static class ConstraintConfigurationValidator
                 typeParameter.Name));
         }
     }
-
-    private static bool IsSystemType(ITypeSymbol type) =>
-        type is INamedTypeSymbol namedType &&
-        string.Equals(namedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), "global::System.Type", StringComparison.Ordinal);
 
     private static Location GetAttributeLocation(AttributeData attribute, ISymbol symbol) =>
         attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()

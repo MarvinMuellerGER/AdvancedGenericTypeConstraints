@@ -93,37 +93,48 @@ public sealed class AdvancedGenericTypeConstraintAnalyzer : DiagnosticAnalyzer
             if (!symbols.HasAny)
                 return;
 
+            var cache = new ConstraintCache(startContext.Compilation, symbols);
+
             startContext.RegisterOperationAction(
-                operationContext => AnalyzeInvocation(operationContext, symbols),
+                operationContext => AnalyzeInvocation(operationContext, symbols, cache),
                 OperationKind.Invocation);
 
             startContext.RegisterSyntaxNodeAction(
-                syntaxContext => AnalyzeGenericTypeUsage(syntaxContext, symbols),
+                syntaxContext => AnalyzeGenericTypeUsage(syntaxContext, symbols, cache),
                 SyntaxKind.GenericName);
 
             startContext.RegisterSymbolAction(
-                symbolContext => AnalyzeMethod(symbolContext, symbols),
+                symbolContext => AnalyzeMethod(symbolContext, symbols, cache),
                 SymbolKind.Method);
 
             startContext.RegisterSymbolAction(
-                symbolContext => AnalyzeNamedType(symbolContext, symbols),
+                symbolContext => AnalyzeNamedType(symbolContext, symbols, cache),
                 SymbolKind.NamedType);
         });
     }
 
-    private static void AnalyzeMethod(SymbolAnalysisContext context, ConstraintAttributeSymbols symbols)
+    private static void AnalyzeMethod(
+        SymbolAnalysisContext context,
+        ConstraintAttributeSymbols symbols,
+        ConstraintCache cache)
     {
         var method = (IMethodSymbol)context.Symbol;
-        ConstraintConfigurationValidator.Validate(method, symbols, context.ReportDiagnostic);
+        ConstraintConfigurationValidator.Validate(method, symbols, cache, context.ReportDiagnostic);
     }
 
-    private static void AnalyzeNamedType(SymbolAnalysisContext context, ConstraintAttributeSymbols symbols)
+    private static void AnalyzeNamedType(
+        SymbolAnalysisContext context,
+        ConstraintAttributeSymbols symbols,
+        ConstraintCache cache)
     {
         var namedType = (INamedTypeSymbol)context.Symbol;
-        ConstraintConfigurationValidator.Validate(namedType.TypeParameters, symbols, context.ReportDiagnostic);
+        ConstraintConfigurationValidator.Validate(namedType.TypeParameters, symbols, cache, context.ReportDiagnostic);
     }
 
-    private static void AnalyzeInvocation(OperationAnalysisContext context, ConstraintAttributeSymbols symbols)
+    private static void AnalyzeInvocation(
+        OperationAnalysisContext context,
+        ConstraintAttributeSymbols symbols,
+        ConstraintCache cache)
     {
         var invocation = (IInvocationOperation)context.Operation;
         TypeArgumentConstraintValidator.Validate(
@@ -131,15 +142,19 @@ public sealed class AdvancedGenericTypeConstraintAnalyzer : DiagnosticAnalyzer
             invocation.TargetMethod.TypeArguments,
             invocation.Syntax.GetLocation(),
             context.ReportDiagnostic,
-            symbols);
+            cache);
 
         InvocationParameterConstraintValidator.Validate(
             invocation,
             context.ReportDiagnostic,
-            symbols);
+            symbols,
+            cache);
     }
 
-    private static void AnalyzeGenericTypeUsage(SyntaxNodeAnalysisContext context, ConstraintAttributeSymbols symbols)
+    private static void AnalyzeGenericTypeUsage(
+        SyntaxNodeAnalysisContext context,
+        ConstraintAttributeSymbols symbols,
+        ConstraintCache cache)
     {
         var genericName = (GenericNameSyntax)context.Node;
         var symbol = ModelExtensions.GetSymbolInfo(context.SemanticModel, genericName, context.CancellationToken)
@@ -153,6 +168,6 @@ public sealed class AdvancedGenericTypeConstraintAnalyzer : DiagnosticAnalyzer
             namedType.TypeArguments,
             genericName.GetLocation(),
             context.ReportDiagnostic,
-            symbols);
+            cache);
     }
 }
