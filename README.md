@@ -177,8 +177,8 @@ void RegisterInProcessApi(
 
 ```csharp
 featureRegistry.RegisterInProcessApi(
-    serviceType: typeof(ISendResetSalesOrderSurchargesCommandService<>),
-    implementationType: typeof(SendResetSalesOrderSurchargesCommandService<>));
+    serviceType: typeof(IProcessArcaneRequestService<>),
+    implementationType: typeof(ProcessArcaneRequestService<>));
 ```
 
 ### Reference-type and assignability `Type` checks
@@ -207,8 +207,8 @@ void RegisterInProcessApi(
 
 ```csharp
 featureRegistry.RegisterInProcessApi(
-    serviceType: typeof(ISendUpdateWarehouseDeliverySalesCommandService<>),
-    implementationType: typeof(SendUpdateWarehouseDeliverySalesCommandService<>));
+    serviceType: typeof(ICoordinateSkyportShipmentService<>),
+    implementationType: typeof(CoordinateSkyportShipmentService<>));
 ```
 
 Example:
