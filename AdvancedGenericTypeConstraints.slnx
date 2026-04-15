@@ -6,4 +6,7 @@
     <Folder Name="/tests/">
         <Project Path="tests/AdvancedGenericTypeConstraints.Analyzers.Tests/AdvancedGenericTypeConstraints.Analyzers.Tests.csproj"/>
     </Folder>
+    <Folder Name="/benchmarks/">
+        <Project Path="benchmarks/AdvancedGenericTypeConstraints.Analyzers.Benchmarks/AdvancedGenericTypeConstraints.Analyzers.Benchmarks.csproj"/>
+    </Folder>
 </Solution>
